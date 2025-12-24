@@ -5,3 +5,6 @@ Need to make sure that I keep RELEASE_NOTES.md uptodate with changes and the lat
 
 0.3.1
 Just some testing of the versioning system.
+
+0.3.2
+Just some testing of the versioning system.
