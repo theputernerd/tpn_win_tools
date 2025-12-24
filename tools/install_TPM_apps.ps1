@@ -2,12 +2,8 @@
 install_TPM_apps.ps1
 
 Installs compiled EXEs from ..\dist into %USERPROFILE%\tpn_apps
-Creates .cmd wrappers for cmd.exe resolution
+Creates .cmd wrappers
 Prepends install dir to the USER PATH (HKCU\Environment\Path)
-
-Run from repo root:
-  tools\install_TPM_apps.cmd
-
 #>
 
 [CmdletBinding()]
@@ -63,7 +59,6 @@ function Prepend-UserPath([string]$Dir) {
   Write-Host "Prepending to User PATH (persistent): $dirNorm"
   if (-not $DryRun) {
     Set-ItemProperty -Path $envKey -Name Path -Value $newPath
-    # Broadcast env change so new terminals pick it up quicker
     Add-Type -Namespace Win32 -Name NativeMethods -MemberDefinition @"
       [DllImport("user32.dll", SetLastError=true, CharSet=CharSet.Auto)]
       public static extern IntPtr SendMessageTimeout(
@@ -125,4 +120,4 @@ Write-Host "Installed to:   $appDir"
 Write-Host ""
 Write-Host "Open a NEW terminal, then:"
 Write-Host "  where ttree"
-Write-Host "  ttree /?"
+Write-Host "  ttree --version"

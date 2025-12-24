@@ -1,68 +1,184 @@
 # ttree
 
-Windows `tree.com` is noisy and can’t exclude project junk properly.  
-`ttree` is a Windows-style `tree` replacement that supports real excludes/includes while keeping familiar switches.
-
-Repo layout:
-
-```
-scripts\        # app entrypoints (each .py becomes a same-named .exe)
-tools\          # build/install launchers and scripts
-dist\           # compiled .exe output (PyInstaller --distpath)
-build\          # per-app PyInstaller work dirs (--workpath/--specpath)
-```
-
-Install layout (user machine):
-
-```
-%USERPROFILE%\tpn_apps\
-  ttree.exe
-  ttree.cmd
-  ...
-```
-
-`tpn_apps` is prepended to **User PATH** (persistent).
+`ttree` is a Windows-style replacement for `tree.com` with real exclusion rules, JSON output, and a self-test mode designed for inspection by humans or LLMs.
 
 ---
 
-## Build + install
+## What it does
+
+- Produces a directory tree of the current folder (or a given path)
+- Supports basename-based excludes and includes
+- Supports gitignore-aware traversal
+- Emits text or JSON
+- Can write output to files safely
+- Includes a self-test mode that logs real command behavior
+
+---
+
+## Defaults
+
+```bat
+ttree
+```
+
+- Root: current directory
+- Directories and files shown
+- Unicode tree drawing
+- Output to stdout
+
+---
+
+## Windows compatibility switches
+
+| Switch | Meaning |
+|------|--------|
+| `/F` `-F` `--files` | Include files (already default) |
+| `/A` `-A` `--ascii` | ASCII tree drawing |
+| `/?` `-h` `--help` | Help |
+| `/V` `-V` `--version` | Print version and exit |
+
+---
+
+## Exclusion and inclusion rules
+
+Matching is basename-only, case-insensitive, using `*`, `%`, `?`.
+
+### Exclude directories
+
+```bat
+ttree /XD .git .venv build dist
+ttree -xd .git .venv
+ttree --exclude-dirs .git .venv
+ttree --exclude-folder .git .venv
+```
+
+### Exclude files
+
+```bat
+ttree /XF *.pyc *.log
+ttree -xf *.tmp
+ttree --exclude-files *.dll
+```
+
+### Exclude anything (files and folders)
+
+```bat
+ttree --exclude .git .venv build dist .*
+```
+
+### Include directories only
+
+```bat
+ttree --include-dirs scripts tools
+ttree /ID scripts tools
+```
+
+---
+
+## Showing or hiding content
+
+| Switch | Effect |
+|-----|-------|
+| `--no-dirs` `/ND` | Hide directories |
+| `--no-files` `/NF` | Hide files |
+| `--show-dirs` | Force directories on |
+| `--show-files` | Force files on |
+
+---
+
+## Gitignore support
+
+```bat
+ttree --gitignore
+```
+
+Best-effort subset of gitignore rules.
+
+---
+
+## Output control
+
+### Write output to default file
+
+```bat
+ttree --out
+```
+
+Creates `<folder>-tree.txt` in the current directory.
+
+### Specify output file
+
+```bat
+ttree --out mytree.txt
+```
+
+### Overwrite output file
+
+```bat
+ttree --out mytree.txt --overwrite
+```
+
+---
+
+## JSON output
+
+```bat
+ttree --json
+ttree --json --out tree.json
+```
+
+---
+
+## Summary counts
+
+```bat
+ttree --summary
+```
+
+---
+
+## Self-test mode
+
+### Run self-test
+
+```bat
+ttree --self-test
+```
+
+- Runs real `ttree` invocations
+- Exercises excludes, includes, gitignore, JSON, and `--out`
+- Writes a full inspection log
+
+Default log file:
+
+```
+ttree-self-test.log
+```
+
+### Split logs per test
+
+```bat
+ttree --self-test-split
+```
+
+Creates a per-test log directory alongside the index log.
+
+---
+
+## Build and install
 
 From repo root:
 
 ```bat
-tools\BUILD_AND_INSTALL.cmd
+BUILD_AND_INSTALL.cmd
 ```
 
-What it does:
-
-1) Ensures build deps are installed into the active interpreter (`pip install -r requirements.txt`)
-2) Compiles every `scripts\*.py` into `dist\*.exe` (name = script basename)
-3) Installs all `dist\*.exe` into `%USERPROFILE%\tpn_apps`
-4) Creates `.cmd` wrappers for reliable `cmd.exe` resolution
-5) Prepends `%USERPROFILE%\tpn_apps` to **User PATH** (persistent)
-
-After install, open a **new** terminal:
-
-```bat
-where ttree
-ttree /?
-```
+Compiles, installs, and adds `ttree` to the user PATH.
 
 ---
 
-## Manual build
+## Versioning
 
-```bat
-pip install -r requirements.txt
-tools\compile_all_apps.cmd
-```
-
----
-
-## Manual install
-
-```bat
-tools\install_TPM_apps.cmd
-```
-
----
+- Version stored in `VERSION`
+- Exposed via `ttree --version`
+- Embedded in JSON output and self-test logs
