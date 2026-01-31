@@ -122,8 +122,20 @@ function Invoke-Logged {
 
   if ($output) {
     foreach ($line in $output) {
-      Write-Host $line
-      Add-Content -Path $logFile -Value $line -Encoding ASCII
+      $text = $null
+      if ($line -is [System.Management.Automation.ErrorRecord]) {
+        if ($line.Exception -and $line.Exception.Message) {
+          $text = $line.Exception.Message
+        } else {
+          $text = $line.ToString()
+        }
+      } else {
+        $text = [string]$line
+      }
+      if (-not $text) { continue }
+      if ($text.Trim() -eq "System.Management.Automation.RemoteException") { continue }
+      Write-Host $text
+      Add-Content -Path $logFile -Value $text -Encoding ASCII
     }
   }
   return $exitCode
@@ -147,6 +159,24 @@ try {
   }
   Write-Log ("Current bundle VERSION: " + $currentVersion)
 
+  $latestTag = $null
+  $tagListAll = & git tag --list "v*" --sort=-version:refname
+  if ($LASTEXITCODE -ne 0) { throw "git tag --list failed." }
+  foreach ($t in $tagListAll) {
+    if ($t -and $t.Trim()) { $latestTag = $t.Trim(); break }
+  }
+  if ($latestTag) {
+    Write-Log ("Latest tag: " + $latestTag)
+  }
+  $currentTag = "v" + $currentVersion
+  $currentTagExists = $false
+  foreach ($t in $tagListAll) {
+    if ($t.Trim() -eq $currentTag) { $currentTagExists = $true; break }
+  }
+  $tagExistsText = "no"
+  if ($currentTagExists) { $tagExistsText = "yes" }
+  Write-Log ("Current version tag exists: " + $tagExistsText)
+
   if ($releaseVersion) { $releaseVersion = $releaseVersion.Trim() }
   if (-not $releaseVersion) { $releaseVersion = $currentVersion }
 
@@ -162,8 +192,13 @@ try {
   while ($true) {
     if (-not $releaseVersion) { $releaseVersion = $currentVersion }
     $tag = "v" + $releaseVersion
-    & git show-ref --verify --quiet ("refs/tags/" + $tag)
-    if ($LASTEXITCODE -eq 0) {
+    $tagList = & git tag --list $tag
+    if ($LASTEXITCODE -ne 0) { throw "git tag --list failed." }
+    $tagExists = $false
+    foreach ($t in $tagList) {
+      if ($t.Trim() -eq $tag) { $tagExists = $true; break }
+    }
+    if ($tagExists) {
       Write-Log ("*** ERROR: tag " + $tag + " already exists ***")
       if ($autoYes) { throw "Tag exists." }
       $newVersion = Read-Host ("Tag " + $tag + " exists. Enter a new release version or leave blank to abort")
@@ -239,6 +274,12 @@ try {
   if (-not $doCommit) {
     Write-Log "Skipping commit and tag."
     return
+  }
+
+  $tagList = & git tag --list $tag
+  if ($LASTEXITCODE -ne 0) { throw "git tag --list failed." }
+  foreach ($t in $tagList) {
+    if ($t.Trim() -eq $tag) { throw ("Tag " + $tag + " already exists.") }
   }
 
   $addExit = Invoke-Logged -Command "git" -Arguments @("add", "-A")
