@@ -1322,7 +1322,7 @@ def recursive_download(start_urls, args, headers):
 def main():
     parser = argparse.ArgumentParser(
         prog="twget",
-        description="twget: wget-like downloader with optional multi-threading.",
+        description="twget: downloader with resume, recursion, and optional multi-threading.",
     )
     parser.add_argument("urls", nargs="*", help="URL(s) to download")
     parser.add_argument("-V", "--version", action="store_true", help="Show version and exit")

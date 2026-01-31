@@ -2,6 +2,10 @@
 /dist/
 /.venv/
 /.venv_py*/
+deploy_release.log
+release_build.log
+tools/deploy_release.log
+tools/release_build.log
 /.idea/misc.xml
 /.idea/modules.xml
 /.idea/inspectionProfiles/profiles_settings.xml

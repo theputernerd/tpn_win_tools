@@ -1,6 +1,6 @@
 # twget
 
-A small Python downloader with wget-like behavior and optional multi-threaded downloads.
+A small Python downloader with resume, recursion, and optional multi-threaded downloads.
 
 ## Usage
 

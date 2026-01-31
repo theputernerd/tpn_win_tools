@@ -70,8 +70,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
-import _version
-
 
 def _read_tool_version(default: str) -> str:
     v_path = Path(__file__).with_name("VERSION")
@@ -89,8 +87,8 @@ except Exception:
     _BUNDLE_VERSION = None
     _TOOL_VERSION = None
 
-BUNDLE_VERSION = _BUNDLE_VERSION or _version.__version__
-TOOL_VERSION = _TOOL_VERSION or _read_tool_version(BUNDLE_VERSION)
+TOOL_VERSION = _TOOL_VERSION or _read_tool_version("0.0.0")
+BUNDLE_VERSION = _BUNDLE_VERSION or TOOL_VERSION
 
 
 def _like_to_regex(pat: str) -> re.Pattern:

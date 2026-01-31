@@ -1,2 +1,2 @@
-v0.3.7
+Latest changes:
 - Initial per-tool versioning and release notes

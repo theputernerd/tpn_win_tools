@@ -6,7 +6,7 @@ The build produces standalone EXEs in `dist` and can install them onto the user 
 ## Toolset
 
 - `ttree` - Enhanced tree listing with excludes, JSON output, and self-test. See `scripts/ttree/README.md`.
-- `twget` - Wget-like downloader with resume, recursion, and optional multi-threading. See `scripts/twget/README.md`.
+- `twget` - Downloader with resume, recursion, and optional multi-threading. See `scripts/twget/README.md`.
 
 ## Repo layout
 
@@ -60,15 +60,16 @@ py -3.11 -m pip install -r requirements_py3.11.txt
 
 ## Versioning and release notes
 
-- Update `VERSION` for each release.
+- `VERSION` is the single source of truth for the bundle version.
 - Update per-tool versions in `scripts\<tool>\VERSION` when a tool changes.
-- Add a brief summary to `RELEASE_NOTES.md`.
-- Add per-tool notes to `scripts\<tool>\RELEASE_NOTES.md`.
+- Keep `RELEASE_NOTES.md` as latest-only notes (no version header).
+- Keep `scripts\<tool>\RELEASE_NOTES.md` as latest-only notes (no version header).
 - The bundle version is embedded into each EXE during build.
 
 ## Release checklist
 
-1. `tools\compile_all_apps.cmd`
+1. `tools\deploy_release.cmd`
 2. Verify `dist\` EXEs run (`ttree --version`, `twget --version`).
-3. Create a git tag for the release.
-4. Upload `dist\` EXEs to the release page (do not commit `dist`).
+3. Optional local install: `BUILD_AND_INSTALL.cmd`
+4. Create a git tag for the release.
+5. Upload `dist\` EXEs to the release page (do not commit `dist`).

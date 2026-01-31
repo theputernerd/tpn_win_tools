@@ -92,10 +92,8 @@ function Parse-VenvSpecFromName([string]$Name) {
 function Get-RootRequirementsPath([string]$RepoRoot, [string]$PySpecNorm, [string]$DefaultSpec) {
   $ver = if ($PySpecNorm) { $PySpecNorm } else { $DefaultSpec }
   $verFile = Join-Path $RepoRoot ("requirements_py" + $ver + ".txt")
-  $defaultFile = Join-Path $RepoRoot "requirements.txt"
 
   if (Test-Path -LiteralPath $verFile) { return $verFile }
-  if ($ver -eq $DefaultSpec -and (Test-Path -LiteralPath $defaultFile)) { return $defaultFile }
 
   throw "requirements file not found for Python $ver. Expected: $verFile"
 }

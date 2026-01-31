@@ -15,6 +15,11 @@ for %%I in ("%SCRIPT_DIR%.") do set "REPO_ROOT=%%~fI"
 
 rem Tools directory under repo root
 set "TOOLS_DIR=%REPO_ROOT%\tools"
+set "PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
+if not exist "%PS%" (
+    echo ERROR: Windows PowerShell not found at: %PS%
+    exit /b 1
+)
 
 echo =============================================== > "%LOG_FILE%"
 echo BUILD + INSTALL STARTED >> "%LOG_FILE%"
@@ -46,46 +51,36 @@ echo === Ensuring build dependencies === >> "%LOG_FILE%"
 
 set "PY_CMD="
 set "REQ_FILE="
-for /f "usebackq delims=" %%A in (`"%PS%" -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$root='%REPO_ROOT%'; ^
-   $venvDirs=Get-ChildItem -LiteralPath $root -Directory -Filter '.venv_py*' -ErrorAction SilentlyContinue; ^
-   $choice=$null; ^
-   if ($venvDirs) { ^
-     $cands=foreach ($d in $venvDirs) { ^
-       if ($d.Name -match '^\.venv_py(\d+)\.(\d+)$') { ^
-         [pscustomobject]@{Dir=$d.FullName; Spec=\"$($Matches[1]).$($Matches[2])\"; Ver=[Version]\"$($Matches[1]).$($Matches[2])\"} ^
-       } ^
-     }; ^
-     if ($cands) { $choice=$cands | Sort-Object Ver -Descending | Select-Object -First 1 } ^
-     else { $choice=[pscustomobject]@{Dir=$venvDirs[0].FullName; Spec=$null} } ^
-   }; ^
-   $py=$null; $spec=$null; ^
-   if ($choice) { ^
-     $py=Join-Path $choice.Dir 'Scripts\python.exe'; ^
-     if (-not (Test-Path -LiteralPath $py)) { $py=$null }; ^
-     $spec=$choice.Spec; ^
-   }; ^
-   if (-not $py) { ^
-     $py=Join-Path $root '.venv\Scripts\python.exe'; ^
-     if (-not (Test-Path -LiteralPath $py)) { $py='python' }; ^
-   }; ^
-   if (-not $spec) { ^
-     $spec=& $py -c \"import sys; print('{}.{}'.format(sys.version_info[0], sys.version_info[1]))\" 2>$null; ^
-     if ($LASTEXITCODE -ne 0) { $spec=$null }; ^
-   }; ^
-   $req=$null; ^
-   if ($spec) { $req=Join-Path $root ('requirements_py' + $spec + '.txt') }; ^
-   if (-not $req -or -not (Test-Path -LiteralPath $req)) { $req=Join-Path $root 'requirements.txt' }; ^
-   Write-Output ('PY=' + $py); ^
-   Write-Output ('REQ=' + $req)"`) do (
-    for /f "tokens=1,2 delims==" %%K in ("%%A") do (
-        if /I "%%K"=="PY" set "PY_CMD=%%L"
-        if /I "%%K"=="REQ" set "REQ_FILE=%%L"
-    )
+if not exist "%TOOLS_DIR%\select_build_env.ps1" (
+    echo *** ERROR: tools\select_build_env.ps1 not found ***
+    echo *** ERROR: tools\select_build_env.ps1 not found *** >> "%LOG_FILE%"
+    popd >nul
+    exit /b 1
 )
 
+set "ENV_FILE=%TEMP%\tpn_build_env_%RANDOM%.txt"
+"%PS%" -NoProfile -ExecutionPolicy Bypass -File "%TOOLS_DIR%\select_build_env.ps1" -RepoRoot "%REPO_ROOT%" > "%ENV_FILE%"
+if errorlevel 1 (
+    echo *** ERROR: select_build_env.ps1 failed ***
+    echo *** ERROR: select_build_env.ps1 failed *** >> "%LOG_FILE%"
+    del "%ENV_FILE%" >nul 2>&1
+    popd >nul
+    exit /b 1
+)
+
+for /f "usebackq tokens=1* delims==" %%K in ("%ENV_FILE%") do (
+    if /I "%%K"=="PY" set "PY_CMD=%%L"
+    if /I "%%K"=="REQ" set "REQ_FILE=%%L"
+)
+del "%ENV_FILE%" >nul 2>&1
+
 if not defined PY_CMD set "PY_CMD=python"
-if not defined REQ_FILE set "REQ_FILE=%REPO_ROOT%\requirements.txt"
+if not defined REQ_FILE (
+    echo *** ERROR: matching requirements_py*.txt not found ***
+    echo *** ERROR: matching requirements_py*.txt not found *** >> "%LOG_FILE%"
+    popd >nul
+    exit /b 1
+)
 
 echo Build Python: %PY_CMD%
 echo Build Python: %PY_CMD% >> "%LOG_FILE%"
