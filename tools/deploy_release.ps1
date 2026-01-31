@@ -98,6 +98,36 @@ function Write-Log {
   Add-Content -Path $logFile -Value $Text
 }
 
+function Normalize-Text {
+  param([string]$Text)
+  if ($null -eq $Text) { return $null }
+  $t = $Text -replace "^\uFEFF", ""
+  $t = $t -replace "\u0000", ""
+  $t = $t.Trim()
+  if (-not $t) { return $null }
+  return $t
+}
+
+function Test-TagExists {
+  param([string]$TagName)
+  if (-not $TagName) { return $false }
+  $oldEA = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  $restoreNative = $false
+  if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+    $restoreNative = $true
+    $oldNative = $PSNativeCommandUseErrorActionPreference
+    $PSNativeCommandUseErrorActionPreference = $false
+  }
+  & git show-ref --verify --quiet ("refs/tags/" + $TagName) | Out-Null
+  $exitCode = $LASTEXITCODE
+  if ($restoreNative) {
+    $PSNativeCommandUseErrorActionPreference = $oldNative
+  }
+  $ErrorActionPreference = $oldEA
+  return ($exitCode -eq 0)
+}
+
 function Invoke-Logged {
   param(
     [string]$Command,
@@ -132,8 +162,9 @@ function Invoke-Logged {
       } else {
         $text = [string]$line
       }
+      $text = Normalize-Text $text
       if (-not $text) { continue }
-      if ($text.Trim() -eq "System.Management.Automation.RemoteException") { continue }
+      if ($text -eq "System.Management.Automation.RemoteException") { continue }
       Write-Host $text
       Add-Content -Path $logFile -Value $text -Encoding ASCII
     }
@@ -154,7 +185,7 @@ try {
   $versionPath = Join-Path $repoRoot "VERSION"
   $currentVersion = "0.0.0"
   if (Test-Path -LiteralPath $versionPath) {
-    $currentVersion = (Get-Content -LiteralPath $versionPath -Raw).Trim()
+    $currentVersion = Normalize-Text (Get-Content -LiteralPath $versionPath -Raw)
     if (-not $currentVersion) { $currentVersion = "0.0.0" }
   }
   Write-Log ("Current bundle VERSION: " + $currentVersion)
@@ -163,47 +194,39 @@ try {
   $tagListAll = & git tag --list "v*" --sort=-version:refname
   if ($LASTEXITCODE -ne 0) { throw "git tag --list failed." }
   foreach ($t in $tagListAll) {
-    if ($t -and $t.Trim()) { $latestTag = $t.Trim(); break }
+    $tNorm = Normalize-Text $t
+    if ($tNorm) { $latestTag = $tNorm; break }
   }
   if ($latestTag) {
     Write-Log ("Latest tag: " + $latestTag)
   }
   $currentTag = "v" + $currentVersion
-  $currentTagExists = $false
-  foreach ($t in $tagListAll) {
-    if ($t.Trim() -eq $currentTag) { $currentTagExists = $true; break }
-  }
+  $currentTagExists = Test-TagExists $currentTag
   $tagExistsText = "no"
   if ($currentTagExists) { $tagExistsText = "yes" }
   Write-Log ("Current version tag exists: " + $tagExistsText)
 
-  if ($releaseVersion) { $releaseVersion = $releaseVersion.Trim() }
+  if ($releaseVersion) { $releaseVersion = Normalize-Text $releaseVersion }
   if (-not $releaseVersion) { $releaseVersion = $currentVersion }
 
   if ($autoYes) {
     Write-Log ("Release version: " + $releaseVersion)
   } else {
     $inputVersion = Read-Host ("Release version [" + $releaseVersion + "]")
-    if ($inputVersion) {
-      $releaseVersion = $inputVersion.Trim()
-    }
+    $inputVersion = Normalize-Text $inputVersion
+    if ($inputVersion) { $releaseVersion = $inputVersion }
   }
 
   while ($true) {
     if (-not $releaseVersion) { $releaseVersion = $currentVersion }
     $tag = "v" + $releaseVersion
-    $tagList = & git tag --list $tag
-    if ($LASTEXITCODE -ne 0) { throw "git tag --list failed." }
-    $tagExists = $false
-    foreach ($t in $tagList) {
-      if ($t.Trim() -eq $tag) { $tagExists = $true; break }
-    }
-    if ($tagExists) {
+    if (Test-TagExists $tag) {
       Write-Log ("*** ERROR: tag " + $tag + " already exists ***")
       if ($autoYes) { throw "Tag exists." }
       $newVersion = Read-Host ("Tag " + $tag + " exists. Enter a new release version or leave blank to abort")
+      $newVersion = Normalize-Text $newVersion
       if (-not $newVersion) { throw "Aborted." }
-      $releaseVersion = $newVersion.Trim()
+      $releaseVersion = $newVersion
       continue
     }
     break
@@ -212,12 +235,7 @@ try {
   Write-Log ("Using release version: " + $releaseVersion)
   Set-Content -Path $versionPath -Value $releaseVersion -Encoding ASCII
 
-  $continueBuild = $true
-  if (-not $autoYes) {
-    $resp = Read-Host "Continue with build (y/N)"
-    $continueBuild = ($resp -match "^(?i)y")
-  }
-  if (-not $continueBuild) { throw "Aborted." }
+  # Proceed directly after version selection.
 
   Write-Log ""
   Write-Log "=== Compiling apps ==="
@@ -258,6 +276,7 @@ try {
     Write-Log ("Commit message: " + $commitMsg)
   } else {
     $inputMsg = Read-Host ("Commit message [" + $commitMsg + "]")
+    $inputMsg = Normalize-Text $inputMsg
     if ($inputMsg) { $commitMsg = $inputMsg }
   }
 
@@ -276,11 +295,7 @@ try {
     return
   }
 
-  $tagList = & git tag --list $tag
-  if ($LASTEXITCODE -ne 0) { throw "git tag --list failed." }
-  foreach ($t in $tagList) {
-    if ($t.Trim() -eq $tag) { throw ("Tag " + $tag + " already exists.") }
-  }
+  if (Test-TagExists $tag) { throw ("Tag " + $tag + " already exists.") }
 
   $addExit = Invoke-Logged -Command "git" -Arguments @("add", "-A")
   if ($addExit -ne 0) { throw "git add failed." }
