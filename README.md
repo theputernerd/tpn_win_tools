@@ -6,7 +6,7 @@ The build produces standalone EXEs in `dist` and can install them onto the user 
 ## Toolset
 
 - `ttree` - Enhanced tree listing with excludes, JSON output, and self-test. See `scripts/ttree/README.md`.
-- `wget` - Wget-like downloader with resume, recursion, and optional multi-threading. See `scripts/wget/README.md`.
+- `twget` - Wget-like downloader with resume, recursion, and optional multi-threading. See `scripts/twget/README.md`.
 
 ## Repo layout
 
@@ -69,6 +69,6 @@ py -3.11 -m pip install -r requirements_py3.11.txt
 ## Release checklist
 
 1. `tools\compile_all_apps.cmd`
-2. Verify `dist\` EXEs run (`ttree --version`, `wget --version`).
+2. Verify `dist\` EXEs run (`ttree --version`, `twget --version`).
 3. Create a git tag for the release.
 4. Upload `dist\` EXEs to the release page (do not commit `dist`).

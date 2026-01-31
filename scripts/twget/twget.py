@@ -14,8 +14,6 @@ from urllib import parse, request
 
 CHUNK_SIZE = 256 * 1024
 DEFAULT_SEGMENT_SIZE = 5 * 1024 * 1024
-DEFAULT_USER_AGENT = "wget_tool/1.0"
-CANCEL_EVENT = threading.Event()
 
 
 def read_tool_version(default="0.0.0"):
@@ -35,6 +33,9 @@ except Exception:
     _TOOL_VERSION = None
 if _TOOL_VERSION:
     TOOL_VERSION = _TOOL_VERSION
+
+DEFAULT_USER_AGENT = f"twget/{TOOL_VERSION}"
+CANCEL_EVENT = threading.Event()
 
 
 class LinkExtractor(HTMLParser):
@@ -1320,7 +1321,8 @@ def recursive_download(start_urls, args, headers):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Simple wget-like downloader with optional multi-threading."
+        prog="twget",
+        description="twget: wget-like downloader with optional multi-threading.",
     )
     parser.add_argument("urls", nargs="*", help="URL(s) to download")
     parser.add_argument("-V", "--version", action="store_true", help="Show version and exit")
