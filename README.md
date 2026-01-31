@@ -28,8 +28,9 @@ The build produces standalone EXEs in `dist` and can install them onto the user 
    - `scripts\tool.requirements.txt` for root tools
 6. If the tool uses a shared build env, add those dependencies to the matching root requirements file:
    - `.venv_py<major>.<minor>` uses `requirements_py<major>.<minor>.txt`
-   - `.venv` uses `requirements.txt` (fallback)
-7. If the tool needs a specific Python version, add:
+7. Add `scripts\tool\VERSION` and keep it in sync with the tool changes.
+8. Add `scripts\tool\RELEASE_NOTES.md` and keep it updated for that tool.
+9. If the tool needs a specific Python version, add:
    - `scripts\tool\python-version.txt` for folder tools
    - `scripts\tool.python-version.txt` for root tools
    The build uses the Windows `py` launcher with the version string (for example `3.11` or `3.11-64`).
@@ -44,26 +45,25 @@ tools\compile_all_apps.cmd
 BUILD_AND_INSTALL.cmd
 ```
 
-Build deps live in `requirements_py<major>.<minor>.txt` for `.venv_py<major>.<minor>`
-and in `requirements.txt` for the `.venv` fallback (PyInstaller).
+Build deps live in `requirements_py<major>.<minor>.txt` matching `.venv_py<major>.<minor>` (PyInstaller).
 If you pin a tool to a specific Python version, install build deps from the matching file, for example:
 
 ```bat
 py -3.11 -m pip install -r requirements_py3.11.txt
 ```
 
-If you keep only `requirements.txt` for the fallback `.venv`, the build will use that.
-
 ## Build environments
 
-- Default: shared build env from `.venv_py<major>.<minor>` if present (falls back to `.venv`).
+- Default: shared build env from `.venv_py<major>.<minor>`.
 - Different Python version: shared per-version envs under `build\venv\py-<version>` reused across tools.
 - If a tool's requirements install fails in a shared env, the build retries in an isolated env under `build\venv\isolated\`.
 
 ## Versioning and release notes
 
 - Update `VERSION` for each release.
+- Update per-tool versions in `scripts\<tool>\VERSION` when a tool changes.
 - Add a brief summary to `RELEASE_NOTES.md`.
+- Add per-tool notes to `scripts\<tool>\RELEASE_NOTES.md`.
 - The bundle version is embedded into each EXE during build.
 
 ## Release checklist

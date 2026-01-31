@@ -231,6 +231,14 @@ VSVersionInfo(
   Set-Content -LiteralPath $Path -Value $content -Encoding UTF8
 }
 
+function New-ToolVersionModule([string]$Path, [string]$ToolVersion, [string]$BundleVersion) {
+  $content = @"
+TOOL_VERSION = "$ToolVersion"
+BUNDLE_VERSION = "$BundleVersion"
+"@
+  Set-Content -LiteralPath $Path -Value $content -Encoding ASCII
+}
+
 $repoRoot = Normalize-FullPath (Join-Path $PSScriptRoot "..")
 
 if (-not $AppsDir) { $AppsDir = Join-Path $repoRoot "scripts" }
@@ -370,24 +378,32 @@ foreach ($f in $pyFiles) {
 
   $reqPath = $null
   $pyVerPath = $null
+  $toolVerPath = $null
 
   if ($entryDirNorm.Equals($appsDirNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
     $altDir = Join-Path $AppsDir $name
     $altReq = Join-Path $altDir "requirements.txt"
     $altPy = Join-Path $altDir "python-version.txt"
+    $altVer = Join-Path $altDir "VERSION"
     $rootReq = Join-Path $AppsDir ($name + ".requirements.txt")
     $rootPy = Join-Path $AppsDir ($name + ".python-version.txt")
+    $rootVer = Join-Path $AppsDir ($name + ".VERSION")
 
     if (Test-Path -LiteralPath $altReq) { $reqPath = $altReq }
     elseif (Test-Path -LiteralPath $rootReq) { $reqPath = $rootReq }
 
     if (Test-Path -LiteralPath $altPy) { $pyVerPath = $altPy }
     elseif (Test-Path -LiteralPath $rootPy) { $pyVerPath = $rootPy }
+
+    if (Test-Path -LiteralPath $altVer) { $toolVerPath = $altVer }
+    elseif (Test-Path -LiteralPath $rootVer) { $toolVerPath = $rootVer }
   } else {
     $dirReq = Join-Path $entryDir "requirements.txt"
     $dirPy = Join-Path $entryDir "python-version.txt"
+    $dirVer = Join-Path $entryDir "VERSION"
     if (Test-Path -LiteralPath $dirReq) { $reqPath = $dirReq }
     if (Test-Path -LiteralPath $dirPy) { $pyVerPath = $dirPy }
+    if (Test-Path -LiteralPath $dirVer) { $toolVerPath = $dirVer }
   }
 
   $pySpec = $null
@@ -427,6 +443,12 @@ foreach ($f in $pyFiles) {
 
   $verFile = Join-Path $workPath ($name + ".version")
   New-VersionFile -Path $verFile -AppName $name -BundleVersion $bundleVersion
+
+  $toolVersion = $null
+  if ($toolVerPath) { $toolVersion = Read-OptionalText $toolVerPath }
+  if (-not $toolVersion) { $toolVersion = $bundleVersion }
+  $toolVersionModule = Join-Path $workPath "tool_version.py"
+  New-ToolVersionModule -Path $toolVersionModule -ToolVersion $toolVersion -BundleVersion $bundleVersion
 
   if (-not $usingDefaultEnv) {
     $rootKey = $pyKey + "`n" + $rootReqPath
@@ -508,6 +530,7 @@ foreach ($f in $pyFiles) {
     "--noconfirm",
     "--onefile",
     "--name",$name,
+    "--paths",$workPath,
     "--distpath",$DistDir,
     "--workpath",$workPath,
     "--specpath",$specPath,

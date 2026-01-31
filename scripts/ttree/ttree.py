@@ -73,6 +73,26 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import _version
 
 
+def _read_tool_version(default: str) -> str:
+    v_path = Path(__file__).with_name("VERSION")
+    try:
+        v = v_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return default
+    return v if v else default
+
+
+try:
+    from tool_version import BUNDLE_VERSION as _BUNDLE_VERSION
+    from tool_version import TOOL_VERSION as _TOOL_VERSION
+except Exception:
+    _BUNDLE_VERSION = None
+    _TOOL_VERSION = None
+
+BUNDLE_VERSION = _BUNDLE_VERSION or _version.__version__
+TOOL_VERSION = _TOOL_VERSION or _read_tool_version(BUNDLE_VERSION)
+
+
 def _like_to_regex(pat: str) -> re.Pattern:
     parts: List[str] = []
     for ch in pat:
@@ -357,7 +377,8 @@ def build_tree_json(opt: Options) -> Tuple[Dict[str, object], Counts]:
 
     tree = {
         "root": str(root),
-        "version": _version.__version__,
+        "version": TOOL_VERSION,
+        "bundle_version": BUNDLE_VERSION,
         "tree": walk_dir(root),
     }
     return tree, counts
@@ -505,7 +526,7 @@ def _run_once(argv: List[str]) -> Tuple[str, Counts, Optional[Path]]:
         raise RuntimeError("internal: _run_once called with self-test flags")
 
     if ns.version:
-        return _version.__version__ + "\n", Counts(), None
+        return TOOL_VERSION + "\n", Counts(), None
 
     root = Path(ns.path)
     gi = GitIgnore.load_for_root(root) if ns.gitignore else None
@@ -591,9 +612,9 @@ def _self_test(log_arg: str, split: bool) -> None:
         (["--no-dirs"], "TEXT tree output (no dirs)", "only files at root should appear"),
         (["--no-files"], "TEXT tree output (no files)", "only directories should appear"),
         (["--gitignore"], "TEXT tree output (gitignore)", "items matched by .gitignore should be omitted (best effort)"),
-        (["--json"], "JSON tree output", "JSON object with keys: root, version, tree"),
+        (["--json"], "JSON tree output", "JSON object with keys: root, version, bundle_version, tree"),
         (["--json", "--gitignore"], "JSON tree output (gitignore)", "JSON object, with ignored items removed (best effort)"),
-        (["--version"], "Version output", "prints the package version string"),
+        (["--version"], "Version output", "prints the tool version string"),
     ]
 
     out_text = cwd / "ttree-self-test-output.txt"
@@ -607,7 +628,8 @@ def _self_test(log_arg: str, split: bool) -> None:
     with log_path.open("w", encoding="utf-8", errors="replace") as index_f:
         separator(index_f)
         index_f.write("ttree self-test: START\n")
-        index_f.write(f"bundle version: {_version.__version__}\n")
+        index_f.write(f"tool version: {TOOL_VERSION}\n")
+        index_f.write(f"bundle version: {BUNDLE_VERSION}\n")
         index_f.write(f"cwd: {cwd}\n")
         index_f.write(f"index log: {log_path}\n")
         separator(index_f)
@@ -707,7 +729,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
 
     if ns.version:
-        print(_version.__version__)
+        print(TOOL_VERSION)
         return 0
 
     root = Path(ns.path)

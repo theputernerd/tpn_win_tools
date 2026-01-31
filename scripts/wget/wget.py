@@ -13,9 +13,28 @@ from html.parser import HTMLParser
 from urllib import parse, request
 
 CHUNK_SIZE = 256 * 1024
-DEFAULT_SEGMENT_SIZE = 1 * 1024 * 1024
+DEFAULT_SEGMENT_SIZE = 5 * 1024 * 1024
 DEFAULT_USER_AGENT = "wget_tool/1.0"
 CANCEL_EVENT = threading.Event()
+
+
+def read_tool_version(default="0.0.0"):
+    path = os.path.join(os.path.dirname(__file__), "VERSION")
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            value = handle.read().strip()
+    except OSError:
+        return default
+    return value if value else default
+
+
+TOOL_VERSION = read_tool_version()
+try:
+    from tool_version import TOOL_VERSION as _TOOL_VERSION
+except Exception:
+    _TOOL_VERSION = None
+if _TOOL_VERSION:
+    TOOL_VERSION = _TOOL_VERSION
 
 
 class LinkExtractor(HTMLParser):
@@ -415,24 +434,32 @@ def format_eta(seconds):
     return f"{minutes:02d}:{sec:02d}"
 
 
-def progress_line(downloaded, total_size, start_time):
+def progress_line(downloaded, total_size, start_time, thread_info=None):
     elapsed = max(time.time() - start_time, 0.001)
     rate = downloaded / elapsed
+    thread_text = ""
+    if thread_info:
+        thread_text = f" T{thread_info}"
     if total_size:
         pct = (downloaded / total_size) * 100
         remaining = max(total_size - downloaded, 0)
         eta = remaining / rate if rate > 0 else None
         return (
-            f"{pct:6.2f}% {format_size(downloaded)}/{format_size(total_size)} "
+            f"{pct:6.2f}%{thread_text} {format_size(downloaded)}/{format_size(total_size)} "
             f"{format_size(rate)}/s ETA {format_eta(eta)}"
         )
-    return f"{format_size(downloaded)} {format_size(rate)}/s"
+    return f"{thread_text} {format_size(downloaded)} {format_size(rate)}/s"
 
 
 def progress_worker(progress, total_size, stop_event, quiet):
     while not stop_event.is_set():
         if not quiet:
-            line = progress_line(progress["downloaded"], total_size, progress["start"])
+            line = progress_line(
+                progress["downloaded"],
+                total_size,
+                progress["start"],
+                progress.get("threads"),
+            )
             sys.stdout.write("\r" + line)
             sys.stdout.flush()
         stop_event.wait(0.5)
@@ -581,8 +608,9 @@ def download_single(
     quiet,
     max_tries,
     cancel_event=None,
+    thread_label=None,
 ):
-    progress = {"downloaded": resume_from, "start": time.time()}
+    progress = {"downloaded": resume_from, "start": time.time(), "threads": thread_label}
     stop_event = threading.Event()
     thread = threading.Thread(
         target=progress_worker,
@@ -695,10 +723,13 @@ def range_worker(
     errors,
     parts,
     parts_path,
+    window_stop_event=None,
     cancel_event=None,
 ):
     while True:
         if cancel_event and cancel_event.is_set():
+            return
+        if window_stop_event and window_stop_event.is_set():
             return
         with queue_lock:
             if not queue:
@@ -733,6 +764,11 @@ def download_multi(
     max_tries,
     resume=False,
     segment_size=DEFAULT_SEGMENT_SIZE,
+    auto_threads=False,
+    min_threads=1,
+    max_threads=64,
+    auto_window=30.0,
+    auto_min_gain=0.05,
 ):
     threads = max(1, min(threads, total_size))
     if total_size == 0:
@@ -778,27 +814,11 @@ def download_multi(
             os.remove(parts_path)
         return True
 
-    if not os.path.exists(output_path):
-        with open(output_path, "wb") as out_file:
-            out_file.truncate(total_size)
-    else:
-        current_size = os.path.getsize(output_path)
-        if current_size < total_size:
-            with open(output_path, "ab") as out_file:
-                out_file.truncate(total_size)
-        elif current_size > total_size:
-            with open(output_path, "wb") as out_file:
-                out_file.truncate(total_size)
-            for item in parts["ranges"]:
-                item[2] = False
-            save_parts(parts_path, parts)
-            pending = [
-                (index, start, end)
-                for index, (start, end, done) in enumerate(parts["ranges"])
-                if not done
-            ]
-
-    progress = {"downloaded": completed_bytes(parts), "start": time.time()}
+    progress = {
+        "downloaded": completed_bytes(parts),
+        "start": time.time(),
+        "threads": threads,
+    }
     lock = threading.Lock()
     queue_lock = threading.Lock()
     stop_event = threading.Event()
@@ -812,39 +832,209 @@ def download_multi(
     thread.start()
 
     try:
-        queue = deque(pending)
-        worker_count = min(threads, len(pending))
-        workers = []
-        for _ in range(worker_count):
-            worker = threading.Thread(
-                target=range_worker,
-                args=(
-                    queue,
-                    queue_lock,
-                    url,
-                    output_path,
-                    headers,
-                    timeout,
-                    progress,
-                    lock,
-                    max_tries,
-                    errors,
-                    parts,
-                    parts_path,
-                    cancel_event,
-                ),
-                daemon=True,
-            )
-            worker.start()
-            workers.append(worker)
+        if not os.path.exists(output_path):
+            with open(output_path, "wb") as out_file:
+                out_file.truncate(total_size)
+        else:
+            current_size = os.path.getsize(output_path)
+            if current_size < total_size:
+                with open(output_path, "ab") as out_file:
+                    out_file.truncate(total_size)
+            elif current_size > total_size:
+                with open(output_path, "wb") as out_file:
+                    out_file.truncate(total_size)
+                for item in parts["ranges"]:
+                    item[2] = False
+                save_parts(parts_path, parts)
+                pending = [
+                    (index, start, end)
+                    for index, (start, end, done) in enumerate(parts["ranges"])
+                    if not done
+                ]
 
-        for worker in workers:
-            while worker.is_alive():
-                worker.join(timeout=0.2)
+        queue = deque(pending)
+        if auto_threads:
+            min_threads = max(1, int(min_threads))
+            max_threads = max(min_threads, int(max_threads))
+            current_threads = min(max_threads, max(min_threads, int(threads)))
+            baseline_threads = current_threads
+            baseline_rate = None
+            progress["threads"] = current_threads
+
+            while True:
                 if cancel_event.is_set():
                     break
-            if cancel_event.is_set():
-                break
+                with queue_lock:
+                    if not queue:
+                        break
+
+                start_bytes = progress["downloaded"]
+                start_time = time.time()
+                start_errors = len(errors)
+                window_stop_event = threading.Event()
+                with queue_lock:
+                    queue_size = len(queue)
+                if queue_size == 0:
+                    break
+                worker_count = min(current_threads, queue_size)
+                progress["threads"] = worker_count
+                workers = []
+                for _ in range(worker_count):
+                    worker = threading.Thread(
+                        target=range_worker,
+                        args=(
+                            queue,
+                            queue_lock,
+                            url,
+                            output_path,
+                            headers,
+                            timeout,
+                            progress,
+                            lock,
+                            max_tries,
+                            errors,
+                            parts,
+                            parts_path,
+                            window_stop_event,
+                            cancel_event,
+                        ),
+                        daemon=True,
+                    )
+                    worker.start()
+                    workers.append(worker)
+
+                while True:
+                    if cancel_event.is_set():
+                        break
+                    elapsed = time.time() - start_time
+                    if elapsed >= auto_window:
+                        break
+                    with queue_lock:
+                        if not queue:
+                            break
+                    time.sleep(0.2)
+
+                window_stop_event.set()
+                for worker in workers:
+                    while worker.is_alive():
+                        worker.join(timeout=0.2)
+                        if cancel_event.is_set():
+                            break
+                    if cancel_event.is_set():
+                        break
+
+                elapsed = max(time.time() - start_time, 0.001)
+                bytes_delta = progress["downloaded"] - start_bytes
+                rate = bytes_delta / elapsed
+                errors_delta = len(errors) - start_errors
+
+                with queue_lock:
+                    queue_empty = not queue
+
+                if errors_delta > 0:
+                    if baseline_threads > min_threads:
+                        baseline_threads -= 1
+                        if not quiet:
+                            print(
+                                f"Auto-threads: errors; reducing to {baseline_threads}"
+                            )
+                    current_threads = baseline_threads
+                    progress["threads"] = current_threads
+                    if queue_empty:
+                        break
+                    continue
+
+                if baseline_rate is None:
+                    baseline_rate = rate
+                    baseline_threads = current_threads
+                    if baseline_threads < max_threads:
+                        current_threads = baseline_threads + 1
+                        if not quiet:
+                            print(f"Auto-threads: probing {current_threads}")
+                        progress["threads"] = current_threads
+                    if queue_empty:
+                        break
+                    continue
+
+                if current_threads == baseline_threads:
+                    if baseline_threads < max_threads:
+                        current_threads = baseline_threads + 1
+                        if not quiet:
+                            print(f"Auto-threads: probing {current_threads}")
+                        progress["threads"] = current_threads
+                    elif baseline_threads > min_threads:
+                        current_threads = baseline_threads - 1
+                        if not quiet:
+                            print(f"Auto-threads: probing {current_threads}")
+                        progress["threads"] = current_threads
+                    if queue_empty:
+                        break
+                    continue
+
+                if baseline_rate <= 0:
+                    improved = rate > 0
+                else:
+                    improved = rate >= baseline_rate * (1.0 + auto_min_gain)
+                if improved:
+                    baseline_threads = current_threads
+                    baseline_rate = rate
+                    if baseline_threads < max_threads:
+                        current_threads = baseline_threads + 1
+                        if not quiet:
+                            print(f"Auto-threads: increasing to {current_threads}")
+                        progress["threads"] = current_threads
+                    else:
+                        current_threads = baseline_threads
+                else:
+                    if current_threads > baseline_threads:
+                        if baseline_threads > min_threads:
+                            current_threads = baseline_threads - 1
+                            if not quiet:
+                                print(f"Auto-threads: probing {current_threads}")
+                            progress["threads"] = current_threads
+                        else:
+                            current_threads = baseline_threads
+                    else:
+                        current_threads = baseline_threads
+
+                if queue_empty:
+                    break
+        else:
+            worker_count = min(threads, len(pending))
+            progress["threads"] = worker_count
+            workers = []
+            for _ in range(worker_count):
+                worker = threading.Thread(
+                    target=range_worker,
+                    args=(
+                        queue,
+                        queue_lock,
+                        url,
+                        output_path,
+                        headers,
+                        timeout,
+                        progress,
+                        lock,
+                        max_tries,
+                        errors,
+                        parts,
+                        parts_path,
+                        None,
+                        cancel_event,
+                    ),
+                    daemon=True,
+                )
+                worker.start()
+                workers.append(worker)
+
+            for worker in workers:
+                while worker.is_alive():
+                    worker.join(timeout=0.2)
+                    if cancel_event.is_set():
+                        break
+                if cancel_event.is_set():
+                    break
+
         if not errors and not cancel_event.is_set() and os.path.exists(parts_path):
             os.remove(parts_path)
     finally:
@@ -940,18 +1130,23 @@ def recursive_download(start_urls, args, headers):
             if os.path.exists(parts_path) and supports_range and total_size:
                 if not args.quiet:
                     print(f"Resuming {temp_path} using range metadata.")
-                success = download_multi(
-                    final_url,
-                    temp_path,
-                    headers,
-                    args.timeout,
-                    total_size,
-                    max(args.threads, 1),
-                    args.quiet,
-                    args.max_tries,
-                    resume=True,
-                    segment_size=args.segment_size,
-                )
+                    success = download_multi(
+                        final_url,
+                        temp_path,
+                        headers,
+                        args.timeout,
+                        total_size,
+                        max(args.threads, 1),
+                        args.quiet,
+                        args.max_tries,
+                        resume=True,
+                        segment_size=args.segment_size,
+                        auto_threads=args.auto_threads,
+                        min_threads=args.min_threads,
+                        max_threads=args.max_threads,
+                        auto_window=args.auto_window,
+                        auto_min_gain=args.auto_min_gain,
+                    )
                 if success and finalize_download(temp_path, final_path):
                     update_mtime(final_path, last_modified_ts)
                     enqueue_links(
@@ -979,6 +1174,7 @@ def recursive_download(start_urls, args, headers):
                         args.quiet,
                         args.max_tries,
                         cancel_event=CANCEL_EVENT,
+                        thread_label="1",
                     )
                     if success and finalize_download(temp_path, final_path):
                         update_mtime(final_path, last_modified_ts)
@@ -1014,6 +1210,7 @@ def recursive_download(start_urls, args, headers):
                     args.quiet,
                     args.max_tries,
                     cancel_event=CANCEL_EVENT,
+                    thread_label="1",
                 )
                 if success and finalize_download(temp_path, final_path):
                     update_mtime(final_path, last_modified_ts)
@@ -1076,7 +1273,7 @@ def recursive_download(start_urls, args, headers):
                 continue
 
         threads = max(args.threads, 1)
-        if threads > 1 and supports_range and total_size:
+        if supports_range and total_size and (threads > 1 or args.auto_threads):
             if not args.quiet:
                 print(
                     f"Downloading {final_url} to {temp_path} with {threads} threads."
@@ -1092,6 +1289,11 @@ def recursive_download(start_urls, args, headers):
                 args.max_tries,
                 resume=False,
                 segment_size=args.segment_size,
+                auto_threads=args.auto_threads,
+                min_threads=args.min_threads,
+                max_threads=args.max_threads,
+                auto_window=args.auto_window,
+                auto_min_gain=args.auto_min_gain,
             )
         else:
             if not args.quiet:
@@ -1106,6 +1308,7 @@ def recursive_download(start_urls, args, headers):
                 args.quiet,
                 args.max_tries,
                 cancel_event=CANCEL_EVENT,
+                thread_label="1",
             )
 
         if success and finalize_download(temp_path, final_path):
@@ -1119,7 +1322,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Simple wget-like downloader with optional multi-threading."
     )
-    parser.add_argument("urls", nargs="+", help="URL(s) to download")
+    parser.add_argument("urls", nargs="*", help="URL(s) to download")
+    parser.add_argument("-V", "--version", action="store_true", help="Show version and exit")
     parser.add_argument(
         "-O",
         "--output",
@@ -1127,6 +1331,35 @@ def main():
     )
     parser.add_argument("-P", "--directory", default=".", help="Output directory")
     parser.add_argument("-t", "--threads", type=int, default=4, help="Download threads")
+    parser.add_argument(
+        "--auto-threads",
+        action="store_true",
+        help="Adapt thread count using +/-1 probes.",
+    )
+    parser.add_argument(
+        "--min-threads",
+        type=int,
+        default=1,
+        help="Minimum threads for auto-threads.",
+    )
+    parser.add_argument(
+        "--max-threads",
+        type=int,
+        default=64,
+        help="Maximum threads for auto-threads.",
+    )
+    parser.add_argument(
+        "--auto-window",
+        type=float,
+        default=60.0,
+        help="Seconds per auto-threads measurement window.",
+    )
+    parser.add_argument(
+        "--auto-min-gain",
+        type=float,
+        default=0.05,
+        help="Minimum relative throughput gain to accept a probe.",
+    )
     parser.add_argument("-c", "--continue", dest="continue_download", action="store_true")
     parser.add_argument("-r", "--recursive", action="store_true")
     parser.add_argument("-N", "--timestamping", action="store_true")
@@ -1146,6 +1379,14 @@ def main():
     )
     args = parser.parse_args()
     install_signal_handlers()
+
+    if args.version:
+        print(TOOL_VERSION)
+        return 0
+
+    if not args.urls:
+        parser.print_usage(sys.stderr)
+        return 2
 
     if args.output and len(args.urls) != 1:
         print("error: --output only supported for a single URL", file=sys.stderr)
@@ -1173,6 +1414,19 @@ def main():
     if args.segment_size <= 0:
         print("error: --segment-size must be greater than 0", file=sys.stderr)
         return 2
+    if args.auto_threads:
+        if args.min_threads < 1:
+            print("error: --min-threads must be at least 1", file=sys.stderr)
+            return 2
+        if args.max_threads < args.min_threads:
+            print("error: --max-threads must be >= --min-threads", file=sys.stderr)
+            return 2
+        if args.auto_window <= 0:
+            print("error: --auto-window must be greater than 0", file=sys.stderr)
+            return 2
+        if args.auto_min_gain < 0:
+            print("error: --auto-min-gain must be >= 0", file=sys.stderr)
+            return 2
 
     headers = build_headers(args.user_agent, extra_headers)
     ensure_directory(args.directory)
@@ -1235,6 +1489,11 @@ def main():
                         args.max_tries,
                         resume=True,
                         segment_size=args.segment_size,
+                        auto_threads=args.auto_threads,
+                        min_threads=args.min_threads,
+                        max_threads=args.max_threads,
+                        auto_window=args.auto_window,
+                        auto_min_gain=args.auto_min_gain,
                     )
                     if success and finalize_download(temp_path, final_path):
                         update_mtime(final_path, last_modified_ts)
@@ -1333,7 +1592,7 @@ def main():
                     continue
 
             threads = max(args.threads, 1)
-            if threads > 1 and supports_range and total_size:
+            if supports_range and total_size and (threads > 1 or args.auto_threads):
                 if not args.quiet:
                     print(
                         f"Downloading {final_url} to {temp_path} with {threads} threads."
@@ -1349,6 +1608,11 @@ def main():
                     args.max_tries,
                     resume=False,
                     segment_size=args.segment_size,
+                    auto_threads=args.auto_threads,
+                    min_threads=args.min_threads,
+                    max_threads=args.max_threads,
+                    auto_window=args.auto_window,
+                    auto_min_gain=args.auto_min_gain,
                 )
             else:
                 if not args.quiet:
@@ -1363,6 +1627,7 @@ def main():
                     args.quiet,
                     args.max_tries,
                     cancel_event=CANCEL_EVENT,
+                    thread_label="1",
                 )
 
             if success and finalize_download(temp_path, final_path):

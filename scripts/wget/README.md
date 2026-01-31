@@ -1,24 +1,41 @@
-# wget_tool
+# wget
 
 A small Python downloader with wget-like behavior and optional multi-threaded downloads.
 
 ## Usage
 
+From source:
+
 ```bash
-python wget_tool.py https://example.com/file.zip
-python wget_tool.py -t 8 https://example.com/file.zip
-python wget_tool.py -c https://example.com/file.zip
-python wget_tool.py -P downloads https://example.com/file.zip
-python wget_tool.py -O output.zip https://example.com/file.zip
-python wget_tool.py -O downloads/ https://example.com/file.zip
-python wget_tool.py -r -N -c -np -P downloads https://example.com/path/
-python wget_tool.py --segment-size 4MB -t 8 https://example.com/bigfile.bin
-python wget_tool.py -c -P downloads -t 4 --timeout 120 https://example.com/bigfile.bin
-python wget_tool.py --overwrite -P downloads -t 4 https://example.com/bigfile.bin
-python wget_tool.py --status -P downloads https://example.com/bigfile.bin
+python wget.py https://example.com/file.zip
+python wget.py -t 8 https://example.com/file.zip
+python wget.py -c https://example.com/file.zip
+python wget.py -P downloads https://example.com/file.zip
+python wget.py -O output.zip https://example.com/file.zip
+python wget.py -O downloads/ https://example.com/file.zip
+python wget.py -r -N -c -np -P downloads https://example.com/path/
+python wget.py --segment-size 4MB -t 8 https://example.com/bigfile.bin
+python wget.py -c -P downloads -t 4 --timeout 120 https://example.com/bigfile.bin
+python wget.py --overwrite -P downloads -t 4 https://example.com/bigfile.bin
+python wget.py --status -P downloads https://example.com/bigfile.bin
+python wget.py --version
+```
+
+After build/install:
+
+```bash
+wget https://example.com/file.zip
+wget -t 8 https://example.com/file.zip
+wget -c https://example.com/file.zip
+wget -P downloads https://example.com/file.zip
+wget -O output.zip https://example.com/file.zip
+wget -O downloads/ https://example.com/file.zip
+wget -r -N -c -np -P downloads https://example.com/path/
+wget --version
 ```
 
 ## Notes
+
 - Multi-threaded mode requires server support for HTTP range requests and a known content length.
 - Resume mode falls back to a single-thread range request when possible.
 - Recursive mode defaults to depth 5; override with `--max-depth`.
@@ -30,3 +47,9 @@ python wget_tool.py --status -P downloads https://example.com/bigfile.bin
 - Existing files are kept unless you pass `-c` or `--overwrite`.
 - Ctrl+C stops the run and keeps partial files; rerun with `-c` to continue.
 - `--status` scans for a matching `.par.parts` file and reports progress from it.
+
+## Versioning
+
+- Tool version stored in `scripts\wget\VERSION`
+- Exposed via `wget --version` (embedded at build time)
+- Release notes in `scripts\wget\RELEASE_NOTES.md`

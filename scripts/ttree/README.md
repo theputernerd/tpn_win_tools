@@ -128,6 +128,8 @@ ttree --json
 ttree --json --out tree.json
 ```
 
+JSON includes `version` (tool) and `bundle_version` (package).
+
 ## Summary counts
 
 ```bat
@@ -172,6 +174,7 @@ Compiles, installs, and adds `ttree` to the user PATH.
 
 ## Versioning
 
-- Version stored in `VERSION`
-- Exposed via `ttree --version`
-- Embedded in JSON output and self-test logs
+- Tool version stored in `scripts\ttree\VERSION`
+- Exposed via `ttree --version` (embedded at build time)
+- Embedded in JSON output and self-test logs (tool + bundle)
+- Release notes in `scripts\ttree\RELEASE_NOTES.md`
