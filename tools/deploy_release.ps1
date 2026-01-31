@@ -1,8 +1,7 @@
 <# 
 deploy_release.ps1
 
-Builds, smoke tests, generates checksums, and prepares a release commit/tag.
-Optional: push and GitHub release when requested.
+Orchestrates release steps by calling per-step scripts.
 #>
 
 [CmdletBinding()]
@@ -25,6 +24,16 @@ function Show-Usage {
   Write-Host "  /no-gh             Skip gh release"
   Write-Host "  /gh                Force gh release"
   Write-Host ""
+}
+
+function Normalize-Text {
+  param([string]$Text)
+  if ($null -eq $Text) { return $null }
+  $t = $Text -replace "^\uFEFF", ""
+  $t = $t -replace "\u0000", ""
+  $t = $t.Trim()
+  if (-not $t) { return $null }
+  return $t
 }
 
 $autoYes = $false
@@ -98,36 +107,6 @@ function Write-Log {
   Add-Content -Path $logFile -Value $Text
 }
 
-function Normalize-Text {
-  param([string]$Text)
-  if ($null -eq $Text) { return $null }
-  $t = $Text -replace "^\uFEFF", ""
-  $t = $t -replace "\u0000", ""
-  $t = $t.Trim()
-  if (-not $t) { return $null }
-  return $t
-}
-
-function Test-TagExists {
-  param([string]$TagName)
-  if (-not $TagName) { return $false }
-  $oldEA = $ErrorActionPreference
-  $ErrorActionPreference = "Continue"
-  $restoreNative = $false
-  if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
-    $restoreNative = $true
-    $oldNative = $PSNativeCommandUseErrorActionPreference
-    $PSNativeCommandUseErrorActionPreference = $false
-  }
-  & git show-ref --verify --quiet ("refs/tags/" + $TagName) | Out-Null
-  $exitCode = $LASTEXITCODE
-  if ($restoreNative) {
-    $PSNativeCommandUseErrorActionPreference = $oldNative
-  }
-  $ErrorActionPreference = $oldEA
-  return ($exitCode -eq 0)
-}
-
 function Invoke-Logged {
   param(
     [string]$Command,
@@ -182,87 +161,60 @@ try {
   $gitExit = Invoke-Logged -Command "git" -Arguments @("status", "--short")
   if ($gitExit -ne 0) { throw "git status failed." }
 
-  $versionPath = Join-Path $repoRoot "VERSION"
-  $currentVersion = "0.0.0"
-  if (Test-Path -LiteralPath $versionPath) {
-    $currentVersion = Normalize-Text (Get-Content -LiteralPath $versionPath -Raw)
-    if (-not $currentVersion) { $currentVersion = "0.0.0" }
-  }
-  Write-Log ("Current bundle VERSION: " + $currentVersion)
+  Write-Log ""
+  Write-Log "=== Select release version ==="
+  $versionOut = Join-Path $env:TEMP ("tpn_release_version_" + [Guid]::NewGuid().ToString("N") + ".txt")
+  $selectArgs = @(
+    "-NoProfile","-ExecutionPolicy","Bypass",
+    "-File",(Join-Path $toolsDir "select_release_version.ps1"),
+    "-RepoRoot",$repoRoot,
+    "-OutFile",$versionOut
+  )
+  if ($releaseVersion) { $selectArgs += @("-Version", $releaseVersion) }
+  if ($autoYes) { $selectArgs += "-AutoYes" }
+  $selExit = Invoke-Logged -Command $psExe -Arguments $selectArgs
+  if ($selExit -ne 0) { throw "Release version selection failed." }
 
-  $latestTag = $null
-  $tagListAll = & git tag --list "v*" --sort=-version:refname
-  if ($LASTEXITCODE -ne 0) { throw "git tag --list failed." }
-  foreach ($t in $tagListAll) {
-    $tNorm = Normalize-Text $t
-    if ($tNorm) { $latestTag = $tNorm; break }
+  $releaseVersion = $null
+  if (Test-Path -LiteralPath $versionOut) {
+    $releaseVersion = Normalize-Text (Get-Content -LiteralPath $versionOut -Raw)
+    Remove-Item -Force -ErrorAction SilentlyContinue $versionOut | Out-Null
   }
-  if ($latestTag) {
-    Write-Log ("Latest tag: " + $latestTag)
-  }
-  $currentTag = "v" + $currentVersion
-  $currentTagExists = Test-TagExists $currentTag
-  $tagExistsText = "no"
-  if ($currentTagExists) { $tagExistsText = "yes" }
-  Write-Log ("Current version tag exists: " + $tagExistsText)
-
-  if ($releaseVersion) { $releaseVersion = Normalize-Text $releaseVersion }
-  if (-not $releaseVersion) { $releaseVersion = $currentVersion }
-
-  if ($autoYes) {
-    Write-Log ("Release version: " + $releaseVersion)
-  } else {
-    $inputVersion = Read-Host ("Release version [" + $releaseVersion + "]")
-    $inputVersion = Normalize-Text $inputVersion
-    if ($inputVersion) { $releaseVersion = $inputVersion }
-  }
-
-  while ($true) {
-    if (-not $releaseVersion) { $releaseVersion = $currentVersion }
-    $tag = "v" + $releaseVersion
-    if (Test-TagExists $tag) {
-      Write-Log ("*** ERROR: tag " + $tag + " already exists ***")
-      if ($autoYes) { throw "Tag exists." }
-      $newVersion = Read-Host ("Tag " + $tag + " exists. Enter a new release version or leave blank to abort")
-      $newVersion = Normalize-Text $newVersion
-      if (-not $newVersion) { throw "Aborted." }
-      $releaseVersion = $newVersion
-      continue
-    }
-    break
-  }
+  if (-not $releaseVersion) { throw "Release version not selected." }
 
   Write-Log ("Using release version: " + $releaseVersion)
-  Set-Content -Path $versionPath -Value $releaseVersion -Encoding ASCII
 
-  # Proceed directly after version selection.
+  Write-Log ""
+  Write-Log "=== Update VERSION ==="
+  $updExit = Invoke-Logged -Command $psExe -Arguments @(
+    "-NoProfile","-ExecutionPolicy","Bypass",
+    "-File",(Join-Path $toolsDir "update_version.ps1"),
+    "-RepoRoot",$repoRoot,
+    "-Version",$releaseVersion
+  )
+  if ($updExit -ne 0) { throw "VERSION update failed." }
 
   Write-Log ""
   Write-Log "=== Compiling apps ==="
   $buildExit = Invoke-Logged -Command "cmd" -Arguments @("/c", (Join-Path $toolsDir "compile_all_apps.cmd")) + $buildArgs
   if ($buildExit -ne 0) { throw "Build failed." }
 
-  if (-not (Test-Path -LiteralPath $distDir)) {
-    throw ("dist directory not found: " + $distDir)
-  }
-
   Write-Log ""
   Write-Log "=== Smoke test ==="
-  $exes = Get-ChildItem -LiteralPath $distDir -Filter "*.exe" -File
-  if (-not $exes -or $exes.Count -eq 0) { throw "No EXEs found in dist." }
-
-  $smokeOk = $true
-  foreach ($exe in $exes) {
-    Write-Log ("Running: " + $exe.Name + " --version")
-    & $exe.FullName --version 2>&1 | Tee-Object -FilePath $logFile -Append
-    if ($LASTEXITCODE -ne 0) { $smokeOk = $false }
-  }
-  if (-not $smokeOk) { throw "One or more EXEs failed --version." }
+  $smokeExit = Invoke-Logged -Command $psExe -Arguments @(
+    "-NoProfile","-ExecutionPolicy","Bypass",
+    "-File",(Join-Path $toolsDir "smoke_test.ps1"),
+    "-DistDir",$distDir
+  )
+  if ($smokeExit -ne 0) { throw "Smoke test failed." }
 
   Write-Log ""
   Write-Log "=== Checksums ==="
-  if (-not (Test-Path -LiteralPath $psExe)) { throw "Windows PowerShell not found." }
-  $csExit = Invoke-Logged -Command $psExe -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $toolsDir "write_checksums.ps1"), "-DistDir", $distDir)
+  $csExit = Invoke-Logged -Command $psExe -Arguments @(
+    "-NoProfile","-ExecutionPolicy","Bypass",
+    "-File",(Join-Path $toolsDir "write_checksums.ps1"),
+    "-DistDir",$distDir
+  )
   if ($csExit -ne 0) { throw "Checksums failed." }
   Write-Log ("Checksums written to: " + (Join-Path $distDir "checksums.sha256"))
 
@@ -270,15 +222,6 @@ try {
   Write-Log ""
   Write-Log "=== Git commit and tag ==="
   Write-Log ("Proposed tag: " + $tag)
-
-  $commitMsg = "Release " + $tag
-  if ($autoYes) {
-    Write-Log ("Commit message: " + $commitMsg)
-  } else {
-    $inputMsg = Read-Host ("Commit message [" + $commitMsg + "]")
-    $inputMsg = Normalize-Text $inputMsg
-    if ($inputMsg) { $commitMsg = $inputMsg }
-  }
 
   if ($skipCommit) {
     Write-Log "Skipping commit and tag."
@@ -295,31 +238,36 @@ try {
     return
   }
 
-  if (Test-TagExists $tag) { throw ("Tag " + $tag + " already exists.") }
-
-  $addExit = Invoke-Logged -Command "git" -Arguments @("add", "-A")
-  if ($addExit -ne 0) { throw "git add failed." }
-
-  $commitExit = Invoke-Logged -Command "git" -Arguments @("commit", "-m", $commitMsg)
-  if ($commitExit -ne 0) { throw "Commit failed." }
-
-  $tagExit = Invoke-Logged -Command "git" -Arguments @("tag", $tag)
-  if ($tagExit -ne 0) { throw "Tag failed." }
+  $commitArgs = @(
+    "-NoProfile","-ExecutionPolicy","Bypass",
+    "-File",(Join-Path $toolsDir "git_commit_tag.ps1"),
+    "-RepoRoot",$repoRoot,
+    "-Tag",$tag
+  )
+  if ($autoYes) { $commitArgs += "-AutoYes" }
+  $commitExit = Invoke-Logged -Command $psExe -Arguments $commitArgs
+  if ($commitExit -ne 0) { throw "Commit/tag failed." }
 
   if ($skipPush) {
     return
   }
 
-  if ($forcePush) {
-    Invoke-Logged -Command "git" -Arguments @("push", "origin", "HEAD", "--tags") | Out-Null
-  } elseif (-not $autoYes) {
-    $resp = Read-Host "Push commit and tags (y/N)"
-    if ($resp -match "^(?i)y") {
-      Invoke-Logged -Command "git" -Arguments @("push", "origin", "HEAD", "--tags") | Out-Null
-    }
-  }
+  $pushExit = Invoke-Logged -Command $psExe -Arguments @(
+    "-NoProfile","-ExecutionPolicy","Bypass",
+    "-File",(Join-Path $toolsDir "git_push.ps1"),
+    "-RepoRoot",$repoRoot,
+    "-Remote","origin"
+  )
+  if ($pushExit -ne 0) { throw "Push failed." }
 
   if ($skipGh) {
+    return
+  }
+
+  $ghCmd = Get-Command gh -ErrorAction SilentlyContinue
+  if (-not $ghCmd) {
+    if ($forceGh) { throw "gh not found on PATH." }
+    Write-Log "gh not found on PATH. Skipping GitHub release."
     return
   }
 
@@ -330,17 +278,16 @@ try {
   }
 
   if ($doGh) {
-    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-      Write-Log "gh not found on PATH. Skipping."
-    } else {
-      Invoke-Logged -Command "gh" -Arguments @(
-        "release","create",$tag,
-        (Join-Path $distDir "*.exe"),
-        (Join-Path $distDir "checksums.sha256"),
-        "-F",(Join-Path $repoRoot "RELEASE_NOTES.md"),
-        "--title",$tag
-      ) | Out-Null
-    }
+    $publishArgs = @(
+      "-NoProfile","-ExecutionPolicy","Bypass",
+      "-File",(Join-Path $toolsDir "publish_release.ps1"),
+      "-Tag",$tag,
+      "-DistDir",$distDir,
+      "-NotesFile",(Join-Path $repoRoot "RELEASE_NOTES.md")
+    )
+    if ($autoYes) { $publishArgs += "-AutoYes" }
+    $pubExit = Invoke-Logged -Command $psExe -Arguments $publishArgs
+    if ($pubExit -ne 0) { throw "Publish release failed." }
   }
 }
 catch {

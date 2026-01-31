@@ -29,11 +29,13 @@ The build produces standalone EXEs in `dist` and can install them onto the user 
 6. If the tool uses a shared build env, add those dependencies to the matching root requirements file:
    - `.venv_py<major>.<minor>` uses `requirements_py<major>.<minor>.txt`
 7. Add `scripts\tool\VERSION` and keep it in sync with the tool changes.
-8. Add `scripts\tool\RELEASE_NOTES.md` and keep it updated for that tool.
-9. If the tool needs a specific Python version, add:
+8. Ensure the tool supports `--version` and prints its tool version.
+9. Add `scripts\tool\RELEASE_NOTES.md` and keep it updated for that tool.
+10. If the tool needs a specific Python version, add:
    - `scripts\tool\python-version.txt` for folder tools
    - `scripts\tool.python-version.txt` for root tools
    The build uses the Windows `py` launcher with the version string (for example `3.11` or `3.11-64`).
+11. Optional: add `scripts\tool\RELEASE_EXAMPLES.md` with release-ready examples for the tool.
 
 ## Build and install
 
@@ -68,8 +70,11 @@ py -3.11 -m pip install -r requirements_py3.11.txt
 
 ## Release checklist
 
+GitHub release uploads require GitHub CLI (`gh`) installed and authenticated (`gh auth login`).
+Release bodies are generated from `RELEASE_TEMPLATE.md`, bundle `RELEASE_NOTES.md`, and per-tool `RELEASE_NOTES.md`.
+
 1. `tools\deploy_release.cmd`
-2. Verify `dist\` EXEs run (`ttree --version`, `twget --version`).
+2. Verify `dist\` EXEs run (`dist\*.exe --version`).
 3. Optional local install: `BUILD_AND_INSTALL.cmd`
 4. Create a git tag for the release.
 5. Upload `dist\` EXEs to the release page (do not commit `dist`).

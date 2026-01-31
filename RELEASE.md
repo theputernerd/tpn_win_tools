@@ -6,6 +6,8 @@
 - Bump tool versions in `scripts\<tool>\VERSION` as needed
 - Update `RELEASE_NOTES.md` (latest-only notes)
 - Update `scripts\<tool>\RELEASE_NOTES.md` (latest-only notes)
+- Update `RELEASE_TEMPLATE.md` if you need to change the release body format
+- Optional: add `scripts\<tool>\RELEASE_EXAMPLES.md` for tool-specific examples
 
 ## 2) Build
 
@@ -40,5 +42,5 @@ for %f in (dist\*.exe) do "%f" --version
 
 ## 5) Publish
 
-- Create a release and upload EXEs from `dist`
-- Publish checksums if needed
+- Use `tools\publish_release.cmd -Tag vX.Y.Z` (requires `gh auth login`)
+- Release body is generated from `RELEASE_TEMPLATE.md` and per-tool release notes
