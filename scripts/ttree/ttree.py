@@ -79,7 +79,7 @@ def _like_to_regex(pat: str) -> re.Pattern:
         if ch in ("*", "%"):
             parts.append(".*")
         elif ch == "?":
-            parts.append(".")
+            parts.append("..")
         else:
             parts.append(re.escape(ch))
     return re.compile(r"^" + "".join(parts) + r"$", re.IGNORECASE)

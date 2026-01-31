@@ -1,184 +1,74 @@
-# ttree
+# tpn_win_tools
 
-`ttree` is a Windows-style replacement for `tree.com` with real exclusion rules, JSON output, and a self-test mode designed for inspection by humans or LLMs.
+tpn_win_tools is a small Windows tool bundle built from Python entrypoints in `scripts`.
+The build produces standalone EXEs in `dist` and can install them onto the user PATH.
 
----
+## Toolset
 
-## What it does
+- `ttree` - Enhanced tree listing with excludes, JSON output, and self-test. See `scripts/ttree/README.md`.
+- `wget` - Wget-like downloader with resume, recursion, and optional multi-threading. See `scripts/wget/README.md`.
 
-- Produces a directory tree of the current folder (or a given path)
-- Supports basename-based excludes and includes
-- Supports gitignore-aware traversal
-- Emits text or JSON
-- Can write output to files safely
-- Includes a self-test mode that logs real command behavior
+## Repo layout
 
----
+- `scripts` - tool entrypoints and per-tool folders
+- `tools` - build and install scripts
+- `build` - PyInstaller work output
+- `dist` - compiled EXEs
 
-## Defaults
+## Adding or updating tools
 
-```bat
-ttree
-```
-
-- Root: current directory
-- Directories and files shown
-- Unicode tree drawing
-- Output to stdout
-
----
-
-## Windows compatibility switches
-
-| Switch | Meaning |
-|------|--------|
-| `/F` `-F` `--files` | Include files (already default) |
-| `/A` `-A` `--ascii` | ASCII tree drawing |
-| `/?` `-h` `--help` | Help |
-| `/V` `-V` `--version` | Print version and exit |
-
----
-
-## Exclusion and inclusion rules
-
-Matching is basename-only, case-insensitive, using `*`, `%`, `?`.
-
-### Exclude directories
-
-```bat
-ttree /XD .git .venv build dist
-ttree -xd .git .venv
-ttree --exclude-dirs .git .venv
-ttree --exclude-folder .git .venv
-```
-
-### Exclude files
-
-```bat
-ttree /XF *.pyc *.log
-ttree -xf *.tmp
-ttree --exclude-files *.dll
-```
-
-### Exclude anything (files and folders)
-
-```bat
-ttree --exclude .git .venv build dist .*
-```
-
-### Include directories only
-
-```bat
-ttree --include-dirs scripts tools
-ttree /ID scripts tools
-```
-
----
-
-## Showing or hiding content
-
-| Switch | Effect |
-|-----|-------|
-| `--no-dirs` `/ND` | Hide directories |
-| `--no-files` `/NF` | Hide files |
-| `--show-dirs` | Force directories on |
-| `--show-files` | Force files on |
-
----
-
-## Gitignore support
-
-```bat
-ttree --gitignore
-```
-
-Best-effort subset of gitignore rules.
-
----
-
-## Output control
-
-### Write output to default file
-
-```bat
-ttree --out
-```
-
-Creates `<folder>-tree.txt` in the current directory.
-
-### Specify output file
-
-```bat
-ttree --out mytree.txt
-```
-
-### Overwrite output file
-
-```bat
-ttree --out mytree.txt --overwrite
-```
-
----
-
-## JSON output
-
-```bat
-ttree --json
-ttree --json --out tree.json
-```
-
----
-
-## Summary counts
-
-```bat
-ttree --summary
-```
-
----
-
-## Self-test mode
-
-### Run self-test
-
-```bat
-ttree --self-test
-```
-
-- Runs real `ttree` invocations
-- Exercises excludes, includes, gitignore, JSON, and `--out`
-- Writes a full inspection log
-
-Default log file:
-
-```
-ttree-self-test.log
-```
-
-### Split logs per test
-
-```bat
-ttree --self-test-split
-```
-
-Creates a per-test log directory alongside the index log.
-
----
+1. Create a tool entrypoint named after the tool:
+   - `scripts\tool.py`
+   - `scripts\tool\tool.py`
+2. Keep other modules under subfolders and avoid extra entrypoints in `scripts` root.
+3. Add or update a tool README at `scripts\tool\README.md`.
+4. Update this Toolset list when adding a new tool.
+5. If the tool needs extra dependencies, add a per-tool file:
+   - `scripts\tool\requirements.txt` for folder tools
+   - `scripts\tool.requirements.txt` for root tools
+6. If the tool uses a shared build env, add those dependencies to the matching root requirements file:
+   - `.venv_py<major>.<minor>` uses `requirements_py<major>.<minor>.txt`
+   - `.venv` uses `requirements.txt` (fallback)
+7. If the tool needs a specific Python version, add:
+   - `scripts\tool\python-version.txt` for folder tools
+   - `scripts\tool.python-version.txt` for root tools
+   The build uses the Windows `py` launcher with the version string (for example `3.11` or `3.11-64`).
 
 ## Build and install
 
 From repo root:
 
 ```bat
+tools\compile_all_apps.cmd -DryRun
+tools\compile_all_apps.cmd
 BUILD_AND_INSTALL.cmd
 ```
 
-Compiles, installs, and adds `ttree` to the user PATH.
+Build deps live in `requirements_py<major>.<minor>.txt` for `.venv_py<major>.<minor>`
+and in `requirements.txt` for the `.venv` fallback (PyInstaller).
+If you pin a tool to a specific Python version, install build deps from the matching file, for example:
 
----
+```bat
+py -3.11 -m pip install -r requirements_py3.11.txt
+```
 
-## Versioning
+If you keep only `requirements.txt` for the fallback `.venv`, the build will use that.
 
-- Version stored in `VERSION`
-- Exposed via `ttree --version`
-- Embedded in JSON output and self-test logs
+## Build environments
+
+- Default: shared build env from `.venv_py<major>.<minor>` if present (falls back to `.venv`).
+- Different Python version: shared per-version envs under `build\venv\py-<version>` reused across tools.
+- If a tool's requirements install fails in a shared env, the build retries in an isolated env under `build\venv\isolated\`.
+
+## Versioning and release notes
+
+- Update `VERSION` for each release.
+- Add a brief summary to `RELEASE_NOTES.md`.
+- The bundle version is embedded into each EXE during build.
+
+## Release checklist
+
+1. `tools\compile_all_apps.cmd`
+2. Verify `dist\` EXEs run (`ttree --version`, `wget --version`).
+3. Create a git tag for the release.
+4. Upload `dist\` EXEs to the release page (do not commit `dist`).

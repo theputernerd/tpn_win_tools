@@ -44,7 +44,55 @@ if not exist "%TOOLS_DIR%\install_TPM_apps.cmd" (
 echo === Ensuring build dependencies ===
 echo === Ensuring build dependencies === >> "%LOG_FILE%"
 
-python -m pip install -r "%REPO_ROOT%\requirements.txt" >> "%LOG_FILE%" 2>&1
+set "PY_CMD="
+set "REQ_FILE="
+for /f "usebackq delims=" %%A in (`"%PS%" -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$root='%REPO_ROOT%'; ^
+   $venvDirs=Get-ChildItem -LiteralPath $root -Directory -Filter '.venv_py*' -ErrorAction SilentlyContinue; ^
+   $choice=$null; ^
+   if ($venvDirs) { ^
+     $cands=foreach ($d in $venvDirs) { ^
+       if ($d.Name -match '^\.venv_py(\d+)\.(\d+)$') { ^
+         [pscustomobject]@{Dir=$d.FullName; Spec=\"$($Matches[1]).$($Matches[2])\"; Ver=[Version]\"$($Matches[1]).$($Matches[2])\"} ^
+       } ^
+     }; ^
+     if ($cands) { $choice=$cands | Sort-Object Ver -Descending | Select-Object -First 1 } ^
+     else { $choice=[pscustomobject]@{Dir=$venvDirs[0].FullName; Spec=$null} } ^
+   }; ^
+   $py=$null; $spec=$null; ^
+   if ($choice) { ^
+     $py=Join-Path $choice.Dir 'Scripts\python.exe'; ^
+     if (-not (Test-Path -LiteralPath $py)) { $py=$null }; ^
+     $spec=$choice.Spec; ^
+   }; ^
+   if (-not $py) { ^
+     $py=Join-Path $root '.venv\Scripts\python.exe'; ^
+     if (-not (Test-Path -LiteralPath $py)) { $py='python' }; ^
+   }; ^
+   if (-not $spec) { ^
+     $spec=& $py -c \"import sys; print('{}.{}'.format(sys.version_info[0], sys.version_info[1]))\" 2>$null; ^
+     if ($LASTEXITCODE -ne 0) { $spec=$null }; ^
+   }; ^
+   $req=$null; ^
+   if ($spec) { $req=Join-Path $root ('requirements_py' + $spec + '.txt') }; ^
+   if (-not $req -or -not (Test-Path -LiteralPath $req)) { $req=Join-Path $root 'requirements.txt' }; ^
+   Write-Output ('PY=' + $py); ^
+   Write-Output ('REQ=' + $req)"`) do (
+    for /f "tokens=1,2 delims==" %%K in ("%%A") do (
+        if /I "%%K"=="PY" set "PY_CMD=%%L"
+        if /I "%%K"=="REQ" set "REQ_FILE=%%L"
+    )
+)
+
+if not defined PY_CMD set "PY_CMD=python"
+if not defined REQ_FILE set "REQ_FILE=%REPO_ROOT%\requirements.txt"
+
+echo Build Python: %PY_CMD%
+echo Build Python: %PY_CMD% >> "%LOG_FILE%"
+echo Build requirements: %REQ_FILE%
+echo Build requirements: %REQ_FILE% >> "%LOG_FILE%"
+
+"%PY_CMD%" -m pip install -r "%REQ_FILE%" >> "%LOG_FILE%" 2>&1
 if errorlevel 1 (
     echo *** pip install failed ***
     echo *** pip install failed *** >> "%LOG_FILE%"

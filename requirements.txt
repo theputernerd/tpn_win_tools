@@ -1,3 +1,0 @@
-# file:/D:/git/ttree/requirements.txt
-pyinstaller>=6.0
-pyinstaller-hooks-contrib>=2024.0

@@ -1,0 +1,3 @@
+# file:/D:/git/tpn_win_tools/requirements-py3.11.txt
+pyinstaller>=6.0
+pyinstaller-hooks-contrib>=2024.0
