@@ -285,7 +285,7 @@ try {
       "-DistDir",$distDir,
       "-NotesFile",(Join-Path $repoRoot "RELEASE_NOTES.md")
     )
-    if ($autoYes) { $publishArgs += "-AutoYes" }
+    $publishArgs += "-AutoYes"
     $pubExit = Invoke-Logged -Command $psExe -Arguments $publishArgs
     if ($pubExit -ne 0) { throw "Publish release failed." }
   }

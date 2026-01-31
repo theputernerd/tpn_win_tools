@@ -66,8 +66,7 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 $toolLines = @()
-$toolNoteBlocks = @()
-$exampleBlocks = @()
+$toolDetailBlocks = @()
 foreach ($tool in $tools) {
   $name = $tool.Name
   if ($name.StartsWith("_")) { continue }
@@ -77,10 +76,11 @@ foreach ($tool in $tools) {
     $toolVer = Normalize-Text (Get-Content -LiteralPath $verPath -Raw)
     if (-not $toolVer) { $toolVer = "0.0.0" }
   }
-  $toolLine = "- " + $name + " (" + $toolVer + ")"
+  $srcCell = "-"
   if ($repoUrl) {
-    $toolLine += " - [src](" + $repoUrl + "/tree/" + $tag + "/scripts/" + $name + ")"
+    $srcCell = "[src](" + $repoUrl + "/tree/" + $tag + "/scripts/" + $name + ")"
   }
+  $toolLine = "| " + $name + " | " + $toolVer + " | " + $srcCell + " |"
   $toolLines += $toolLine
 
   $notePath = Join-Path $tool.FullName "RELEASE_NOTES.md"
@@ -89,24 +89,34 @@ foreach ($tool in $tools) {
     $noteRaw = Normalize-Text (Get-Content -LiteralPath $notePath -Raw)
     if ($noteRaw) { $toolNotes = $noteRaw }
   }
-  $toolNoteBlocks += ("### " + $name + " (" + $toolVer + ")")
-  $toolNoteBlocks += $toolNotes
-  $toolNoteBlocks += ""
 
   $examplePath = Join-Path $tool.FullName "RELEASE_EXAMPLES.md"
+  $toolExamples = "None."
   if (Test-Path -LiteralPath $examplePath) {
     $exRaw = Normalize-Text (Get-Content -LiteralPath $examplePath -Raw)
-    if ($exRaw) {
-      $exampleBlocks += ("### " + $name + " (" + $toolVer + ")")
-      $exampleBlocks += $exRaw
-      $exampleBlocks += ""
-    }
+    if ($exRaw) { $toolExamples = $exRaw }
   }
+
+  $summary = $name + " (" + $toolVer + ")"
+  $toolDetailBlocks += "<details>"
+  $toolDetailBlocks += "<summary>" + $summary + "</summary>"
+  $toolDetailBlocks += ""
+  $toolDetailBlocks += "- Version: " + $toolVer
+  if ($repoUrl) {
+    $toolDetailBlocks += "- Source: [src](" + $repoUrl + "/tree/" + $tag + "/scripts/" + $name + ")"
+  }
+  $toolDetailBlocks += ""
+  $toolDetailBlocks += "#### Release notes"
+  $toolDetailBlocks += $toolNotes
+  $toolDetailBlocks += ""
+  $toolDetailBlocks += "#### Examples"
+  $toolDetailBlocks += $toolExamples
+  $toolDetailBlocks += "</details>"
+  $toolDetailBlocks += ""
 }
 
-$toolsText = if ($toolLines.Count -gt 0) { $toolLines -join "`n" } else { "None." }
-$toolNotesText = if ($toolNoteBlocks.Count -gt 0) { $toolNoteBlocks -join "`n" } else { "None." }
-$examplesText = if ($exampleBlocks.Count -gt 0) { $exampleBlocks -join "`n" } else { "None." }
+$toolsText = if ($toolLines.Count -gt 0) { $toolLines -join "`n" } else { "| (none) | - | - |" }
+$toolDetailsText = if ($toolDetailBlocks.Count -gt 0) { $toolDetailBlocks -join "`n" } else { "None." }
 
 $checksumsText = "checksums.sha256 not found."
 $checksumPath = Join-Path $DistDir "checksums.sha256"
@@ -130,10 +140,9 @@ if ($template) {
   $content = $content.Replace("{{TAG}}", $tag)
   $content = $content.Replace("{{DATE}}", $date)
   $content = $content.Replace("{{TOOLS}}", $toolsText)
+  $content = $content.Replace("{{TOOLS_DETAIL}}", $toolDetailsText)
   $content = $content.Replace("{{BUNDLE_NOTES}}", $bundleNotes)
-  $content = $content.Replace("{{TOOL_NOTES}}", $toolNotesText)
   $content = $content.Replace("{{CHECKSUMS}}", $checksumsText)
-  $content = $content.Replace("{{EXAMPLES}}", $examplesText)
 } else {
   $content = $bundleNotes
 }
