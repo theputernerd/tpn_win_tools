@@ -1,0 +1,224 @@
+=============================================== 
+BUILD + INSTALL STARTED 
+Timestamp: Mon 02/02/2026 20:59:48.11 
+Run dir:   C:\git\tpn_win_tools 
+Repo root: C:\git\tpn_win_tools 
+Tools dir: C:\git\tpn_win_tools\tools 
+=============================================== 
+ 
+=== Ensuring build dependencies === 
+Build Python: C:\git\tpn_win_tools\.venv_py3.11\Scripts\python.exe 
+Build requirements: C:\git\tpn_win_tools\requirements_py3.11.txt 
+Collecting pyinstaller>=6.0 (from -r C:\git\tpn_win_tools\requirements_py3.11.txt (line 2))
+  Downloading pyinstaller-6.18.0-py3-none-win_amd64.whl.metadata (8.5 kB)
+Collecting pyinstaller-hooks-contrib>=2024.0 (from -r C:\git\tpn_win_tools\requirements_py3.11.txt (line 3))
+  Downloading pyinstaller_hooks_contrib-2026.0-py3-none-any.whl.metadata (16 kB)
+Collecting altgraph (from pyinstaller>=6.0->-r C:\git\tpn_win_tools\requirements_py3.11.txt (line 2))
+  Downloading altgraph-0.17.5-py2.py3-none-any.whl.metadata (7.5 kB)
+Collecting packaging>=22.0 (from pyinstaller>=6.0->-r C:\git\tpn_win_tools\requirements_py3.11.txt (line 2))
+  Downloading packaging-26.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting pefile>=2022.5.30 (from pyinstaller>=6.0->-r C:\git\tpn_win_tools\requirements_py3.11.txt (line 2))
+  Downloading pefile-2024.8.26-py3-none-any.whl.metadata (1.4 kB)
+Collecting pywin32-ctypes>=0.2.1 (from pyinstaller>=6.0->-r C:\git\tpn_win_tools\requirements_py3.11.txt (line 2))
+  Downloading pywin32_ctypes-0.2.3-py3-none-any.whl.metadata (3.9 kB)
+Requirement already satisfied: setuptools>=42.0.0 in c:\git\tpn_win_tools\.venv_py3.11\lib\site-packages (from pyinstaller>=6.0->-r C:\git\tpn_win_tools\requirements_py3.11.txt (line 2)) (65.5.0)
+Downloading pyinstaller-6.18.0-py3-none-win_amd64.whl (1.4 MB)
+   ---------------------------------------- 1.4/1.4 MB 8.0 MB/s eta 0:00:00
+Downloading pyinstaller_hooks_contrib-2026.0-py3-none-any.whl (452 kB)
+   ---------------------------------------- 452.3/452.3 kB 9.4 MB/s eta 0:00:00
+Downloading packaging-26.0-py3-none-any.whl (74 kB)
+   ---------------------------------------- 74.4/74.4 kB 4.0 MB/s eta 0:00:00
+Downloading pefile-2024.8.26-py3-none-any.whl (74 kB)
+   ---------------------------------------- 74.8/74.8 kB 4.0 MB/s eta 0:00:00
+Downloading pywin32_ctypes-0.2.3-py3-none-any.whl (30 kB)
+Downloading altgraph-0.17.5-py2.py3-none-any.whl (21 kB)
+Installing collected packages: altgraph, pywin32-ctypes, pefile, packaging, pyinstaller-hooks-contrib, pyinstaller
+Successfully installed altgraph-0.17.5 packaging-26.0 pefile-2024.8.26 pyinstaller-6.18.0 pyinstaller-hooks-contrib-2026.0 pywin32-ctypes-0.2.3
+
+[notice] A new release of pip is available: 24.0 -> 26.0
+[notice] To update, run: C:\git\tpn_win_tools\.venv_py3.11\Scripts\python.exe -m pip install --upgrade pip
+ 
+=== Compiling apps === 
+=== Compiling all apps ===
+Repo: C:\git\tpn_win_tools
+
+
+Repo root: C:\git\tpn_win_tools
+Scripts:   C:\git\tpn_win_tools\scripts
+Dist:      C:\git\tpn_win_tools\dist
+Build:     C:\git\tpn_win_tools\build
+Version:   0.3.8
+Python:    .venv_py3.11 (3.11)
+
+Compiling 2 app(s)...
+
+Installing requirements for ttree: C:\git\tpn_win_tools\scripts\ttree\requirements.txt
+
+[notice] A new release of pip is available: 24.0 -> 26.0
+[notice] To update, run: C:\git\tpn_win_tools\.venv_py3.11\Scripts\python.exe -m pip install --upgrade pip
+==> ttree
+C:\git\tpn_win_tools\.venv_py3.11\Scripts\python.exe -m PyInstaller --noconfirm --onefile --name ttree --paths C:\git\tpn_win_tools\build\ttree --distpath C:\git\tpn_win_tools\dist --workpath C:\git\tpn_win_tools\build\ttree --specpath C:\git\tpn_win_tools\build\ttree\spec --clean --version-file C:\git\tpn_win_tools\build\ttree\ttree.version C:\git\tpn_win_tools\scripts\ttree\ttree.py
+
+108 INFO: PyInstaller: 6.18.0, contrib hooks: 2026.0
+108 INFO: Python: 3.11.9
+113 INFO: Platform: Windows-10-10.0.26200-SP0
+113 INFO: Python environment: C:\git\tpn_win_tools\.venv_py3.11
+113 INFO: wrote C:\git\tpn_win_tools\build\ttree\spec\ttree.spec
+114 INFO: Removing temporary files and cleaning cache in C:\Users\JosephWest\AppData\Local\pyinstaller
+118 INFO: Module search paths (PYTHONPATH):
+['C:\\git\\tpn_win_tools',
+ 'C:\\Users\\JosephWest\\AppData\\Local\\Python\\pythoncore-3.11-64\\python311.zip',
+ 'C:\\Users\\JosephWest\\AppData\\Local\\Python\\pythoncore-3.11-64\\DLLs',
+ 'C:\\Users\\JosephWest\\AppData\\Local\\Python\\pythoncore-3.11-64\\Lib',
+ 'C:\\Users\\JosephWest\\AppData\\Local\\Python\\pythoncore-3.11-64',
+ 'C:\\git\\tpn_win_tools\\.venv_py3.11',
+ 'C:\\git\\tpn_win_tools\\.venv_py3.11\\Lib\\site-packages',
+ 'C:\\git\\tpn_win_tools',
+ 'C:\\git\\tpn_win_tools\\build\\ttree']
+265 INFO: checking Analysis
+265 INFO: Building Analysis because Analysis-00.toc is non existent
+265 INFO: Looking for Python shared library...
+265 INFO: Using Python shared library: C:\Users\JosephWest\AppData\Local\Python\pythoncore-3.11-64\python311.dll
+265 INFO: Running Analysis Analysis-00.toc
+265 INFO: Target bytecode optimization level: 0
+265 INFO: Initializing module dependency graph...
+270 INFO: Initializing module graph hook caches...
+285 INFO: Analyzing modules for base_library.zip ...
+781 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\git\\tpn_win_tools\\.venv_py3.11\\Lib\\site-packages\\PyInstaller\\hooks'
+821 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\git\\tpn_win_tools\\.venv_py3.11\\Lib\\site-packages\\PyInstaller\\hooks'
+1516 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\git\\tpn_win_tools\\.venv_py3.11\\Lib\\site-packages\\PyInstaller\\hooks'
+2758 INFO: Caching module dependency graph...
+2776 INFO: Analyzing C:\git\tpn_win_tools\scripts\ttree\ttree.py
+2804 INFO: Processing module hooks (post-graph stage)...
+2806 INFO: Performing binary vs. data reclassification (1 entries)
+2807 INFO: Looking for ctypes DLLs
+2811 INFO: Analyzing run-time hooks ...
+2811 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\git\\tpn_win_tools\\.venv_py3.11\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+2813 INFO: Creating base_library.zip...
+2822 INFO: Looking for dynamic libraries
+2889 INFO: Extra DLL search directories (AddDllDirectory): []
+2889 INFO: Extra DLL search directories (PATH): []
+2929 INFO: Warnings written to C:\git\tpn_win_tools\build\ttree\ttree\warn-ttree.txt
+2935 INFO: Graph cross-reference written to C:\git\tpn_win_tools\build\ttree\ttree\xref-ttree.html
+2943 INFO: checking PYZ
+2943 INFO: Building PYZ because PYZ-00.toc is non existent
+2943 INFO: Building PYZ (ZlibArchive) C:\git\tpn_win_tools\build\ttree\ttree\PYZ-00.pyz
+3029 INFO: Building PYZ (ZlibArchive) C:\git\tpn_win_tools\build\ttree\ttree\PYZ-00.pyz completed successfully.
+3042 INFO: checking PKG
+3042 INFO: Building PKG because PKG-00.toc is non existent
+3042 INFO: Building PKG (CArchive) ttree.pkg
+4140 INFO: Building PKG (CArchive) ttree.pkg completed successfully.
+4141 INFO: Bootloader C:\git\tpn_win_tools\.venv_py3.11\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\run.exe
+4141 INFO: checking EXE
+4141 INFO: Building EXE because EXE-00.toc is non existent
+4141 INFO: Building EXE from EXE-00.toc
+4141 INFO: Copying bootloader EXE to C:\git\tpn_win_tools\dist\ttree.exe
+4190 INFO: Copying icon to EXE
+4212 INFO: Copying version information to EXE
+4233 INFO: Copying 0 resources to EXE
+4233 INFO: Embedding manifest in EXE
+4253 INFO: Appending PKG archive to EXE
+4278 INFO: Fixing EXE headers
+6034 INFO: Building EXE from EXE-00.toc completed successfully.
+6034 INFO: Build complete! The results are available in: C:\git\tpn_win_tools\dist
+Installing requirements for twget: C:\git\tpn_win_tools\scripts\twget\requirements.txt
+
+[notice] A new release of pip is available: 24.0 -> 26.0
+[notice] To update, run: C:\git\tpn_win_tools\.venv_py3.11\Scripts\python.exe -m pip install --upgrade pip
+==> twget
+C:\git\tpn_win_tools\.venv_py3.11\Scripts\python.exe -m PyInstaller --noconfirm --onefile --name twget --paths C:\git\tpn_win_tools\build\twget --distpath C:\git\tpn_win_tools\dist --workpath C:\git\tpn_win_tools\build\twget --specpath C:\git\tpn_win_tools\build\twget\spec --clean --version-file C:\git\tpn_win_tools\build\twget\twget.version C:\git\tpn_win_tools\scripts\twget\twget.py
+
+60 INFO: PyInstaller: 6.18.0, contrib hooks: 2026.0
+60 INFO: Python: 3.11.9
+66 INFO: Platform: Windows-10-10.0.26200-SP0
+66 INFO: Python environment: C:\git\tpn_win_tools\.venv_py3.11
+66 INFO: wrote C:\git\tpn_win_tools\build\twget\spec\twget.spec
+67 INFO: Removing temporary files and cleaning cache in C:\Users\JosephWest\AppData\Local\pyinstaller
+73 INFO: Module search paths (PYTHONPATH):
+['C:\\git\\tpn_win_tools',
+ 'C:\\Users\\JosephWest\\AppData\\Local\\Python\\pythoncore-3.11-64\\python311.zip',
+ 'C:\\Users\\JosephWest\\AppData\\Local\\Python\\pythoncore-3.11-64\\DLLs',
+ 'C:\\Users\\JosephWest\\AppData\\Local\\Python\\pythoncore-3.11-64\\Lib',
+ 'C:\\Users\\JosephWest\\AppData\\Local\\Python\\pythoncore-3.11-64',
+ 'C:\\git\\tpn_win_tools\\.venv_py3.11',
+ 'C:\\git\\tpn_win_tools\\.venv_py3.11\\Lib\\site-packages',
+ 'C:\\git\\tpn_win_tools\\scripts\\twget',
+ 'C:\\git\\tpn_win_tools\\build\\twget']
+205 INFO: checking Analysis
+205 INFO: Building Analysis because Analysis-00.toc is non existent
+205 INFO: Looking for Python shared library...
+205 INFO: Using Python shared library: C:\Users\JosephWest\AppData\Local\Python\pythoncore-3.11-64\python311.dll
+205 INFO: Running Analysis Analysis-00.toc
+205 INFO: Target bytecode optimization level: 0
+205 INFO: Initializing module dependency graph...
+206 INFO: Initializing module graph hook caches...
+213 INFO: Analyzing modules for base_library.zip ...
+704 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\git\\tpn_win_tools\\.venv_py3.11\\Lib\\site-packages\\PyInstaller\\hooks'
+1392 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\git\\tpn_win_tools\\.venv_py3.11\\Lib\\site-packages\\PyInstaller\\hooks'
+1995 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\git\\tpn_win_tools\\.venv_py3.11\\Lib\\site-packages\\PyInstaller\\hooks'
+2141 INFO: Caching module dependency graph...
+2157 INFO: Analyzing C:\git\tpn_win_tools\scripts\twget\twget.py
+2351 INFO: Processing module hooks (post-graph stage)...
+2353 INFO: Performing binary vs. data reclassification (1 entries)
+2353 INFO: Looking for ctypes DLLs
+2358 INFO: Analyzing run-time hooks ...
+2359 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\git\\tpn_win_tools\\.venv_py3.11\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+2361 INFO: Creating base_library.zip...
+2369 INFO: Looking for dynamic libraries
+2438 INFO: Extra DLL search directories (AddDllDirectory): []
+2439 INFO: Extra DLL search directories (PATH): []
+2484 INFO: Warnings written to C:\git\tpn_win_tools\build\twget\twget\warn-twget.txt
+2492 INFO: Graph cross-reference written to C:\git\tpn_win_tools\build\twget\twget\xref-twget.html
+2502 INFO: checking PYZ
+2502 INFO: Building PYZ because PYZ-00.toc is non existent
+2502 INFO: Building PYZ (ZlibArchive) C:\git\tpn_win_tools\build\twget\twget\PYZ-00.pyz
+2602 INFO: Building PYZ (ZlibArchive) C:\git\tpn_win_tools\build\twget\twget\PYZ-00.pyz completed successfully.
+2604 INFO: checking PKG
+2604 INFO: Building PKG because PKG-00.toc is non existent
+2604 INFO: Building PKG (CArchive) twget.pkg
+3791 INFO: Building PKG (CArchive) twget.pkg completed successfully.
+3792 INFO: Bootloader C:\git\tpn_win_tools\.venv_py3.11\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\run.exe
+3792 INFO: checking EXE
+3792 INFO: Building EXE because EXE-00.toc is non existent
+3792 INFO: Building EXE from EXE-00.toc
+3792 INFO: Copying bootloader EXE to C:\git\tpn_win_tools\dist\twget.exe
+3820 INFO: Copying icon to EXE
+3840 INFO: Copying version information to EXE
+3860 INFO: Copying 0 resources to EXE
+3860 INFO: Embedding manifest in EXE
+3880 INFO: Appending PKG archive to EXE
+3905 INFO: Fixing EXE headers
+4751 INFO: Building EXE from EXE-00.toc completed successfully.
+4751 INFO: Build complete! The results are available in: C:\git\tpn_win_tools\dist
+
+Done.
+EXEs in: C:\git\tpn_win_tools\dist
+
+=== Build complete ===
+ 
+=== Installing apps === 
+=== Installing apps ===
+Repo: C:\git\tpn_win_tools
+
+
+Repo root:  C:\git\tpn_win_tools
+Source:     C:\git\tpn_win_tools\dist
+Install to: C:\Users\JosephWest\tpn_apps
+
+Copy: ttree.exe
+Copy: twget.exe
+Prepending to User PATH (persistent): C:\Users\JosephWest\tpn_apps
+
+Installed EXEs: 2
+Installed to:   C:\Users\JosephWest\tpn_apps
+
+Open a NEW terminal, then:
+  where ttree
+  ttree --version
+
+=== Install complete ===
+ 
+=============================================== 
+BUILD + INSTALL COMPLETED 
+Timestamp: Mon 02/02/2026 21:00:19.09 
+=============================================== 

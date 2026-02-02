@@ -17,6 +17,9 @@ if (-not $RepoRoot) {
   $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 }
 
+$hasPy = Get-Command "py" -ErrorAction SilentlyContinue
+$hasPython = Get-Command "python" -ErrorAction SilentlyContinue
+
 $venvDirs = Get-ChildItem -LiteralPath $RepoRoot -Directory -Filter ".venv_py*" -ErrorAction SilentlyContinue
 $choice = $null
 if ($venvDirs) {
@@ -35,8 +38,59 @@ if ($venvDirs) {
   }
 }
 
+$reqFiles = Get-ChildItem -LiteralPath $RepoRoot -File -Filter "requirements_py*.txt" -ErrorAction SilentlyContinue
+$reqSpecs = @()
+if ($reqFiles) {
+  foreach ($f in $reqFiles) {
+    if ($f.Name -match "^requirements_py(\d+)\.(\d+)\.txt$") {
+      $spec = "$($Matches[1]).$($Matches[2])"
+      $ver = [Version]::new($spec + ".0")
+      $reqSpecs += [PSCustomObject]@{ Spec = $spec; Ver = $ver }
+    }
+  }
+}
+
+if (-not $choice -and $hasPy -and $reqSpecs.Count -gt 0) {
+  $cands = $reqSpecs | Sort-Object Ver -Descending
+  foreach ($c in $cands) {
+    $spec = $c.Spec
+    $probe = & py "-$spec" -c "import sys; print('{}.{}'.format(sys.version_info[0], sys.version_info[1]))" 2>$null
+    if ($LASTEXITCODE -ne 0) { continue }
+    $venvDir = Join-Path $RepoRoot (".venv_py" + $spec)
+    if (-not (Test-Path -LiteralPath $venvDir)) {
+      & py "-$spec" "-m" "venv" $venvDir
+      if ($LASTEXITCODE -ne 0) { continue }
+    }
+    $choice = [PSCustomObject]@{ Dir = $venvDir; Spec = $spec }
+    break
+  }
+}
+
 $py = $null
 $spec = $null
+
+if (-not $choice -and $reqSpecs.Count -gt 0) {
+  if (-not $hasPy) {
+    Write-Host "NOTE: 'py' launcher not found; install it to enable multi-version builds."
+  }
+  if ($hasPython) {
+    $probe = & python -c "import sys; print('{}.{}'.format(sys.version_info[0], sys.version_info[1]))" 2>$null
+    if ($LASTEXITCODE -eq 0) {
+      $sysSpec = $probe.Trim()
+      $match = $reqSpecs | Where-Object { $_.Spec -eq $sysSpec } | Select-Object -First 1
+      if ($match) {
+        $venvDir = Join-Path $RepoRoot (".venv_py" + $sysSpec)
+        if (-not (Test-Path -LiteralPath $venvDir)) {
+          & python "-m" "venv" $venvDir
+        }
+        if (Test-Path -LiteralPath $venvDir) {
+          $choice = [PSCustomObject]@{ Dir = $venvDir; Spec = $sysSpec }
+        }
+      }
+    }
+  }
+}
+
 if ($choice) {
   $py = Join-Path $choice.Dir "Scripts\python.exe"
   if (-not (Test-Path -LiteralPath $py)) { $py = $null }
