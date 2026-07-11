@@ -8,7 +8,7 @@ set -euo pipefail
 # under ./framework/ next to this script, so it can be edited normally and
 # versioned/upgraded in existing projects without clobbering user content.
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 FRAMEWORK_DIR="$SCRIPT_DIR/framework"
 
 MODE="install"          # install | upgrade
