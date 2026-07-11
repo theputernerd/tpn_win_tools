@@ -10,12 +10,22 @@ Successor to the repo-root `install_agent_instructions.sh` (v1/v2) and
 real, editable files under `framework/` (not an inline heredoc), and existing
 projects can be upgraded in place without clobbering user content.
 
+## One-time setup: symlink the bootstrap script into ~
+
+```bash
+cd ~
+/path/to/agent_standard/create_symlink.sh
+```
+
+Creates `~/bootstrap_agent_standard_v4.sh` as a symlink to the real script, so
+it can be run from any project root afterwards.
+
 ## Install into a project
 
 ```bash
 cd <your-project-root>
-/path/to/agent_standard/bootstrap_agent_standard_v4.sh          # fresh install
-/path/to/agent_standard/bootstrap_agent_standard_v4.sh --upgrade  # refresh managed files later
+~/bootstrap_agent_standard_v4.sh          # fresh install
+~/bootstrap_agent_standard_v4.sh --upgrade  # refresh managed files later
 ```
 
 `--upgrade` overwrites only framework-managed files. User content is never
@@ -27,6 +37,8 @@ touched: `instructions/project-commands.sh`, `instructions/product/overview.md`,
 ## Layout
 
 - `bootstrap_agent_standard_v4.sh` — the installer (copies `framework/` into the target).
+- `create_symlink.sh` — one-time setup that symlinks the bootstrap script into
+  the directory it's run from (e.g. `~`).
 - `framework/` — source of truth for everything installed, versioned by
   `framework/.framework-version`. Edit these files to evolve the framework, then
   `--upgrade` projects to pull the changes.
