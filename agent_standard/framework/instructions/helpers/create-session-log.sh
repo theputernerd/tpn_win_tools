@@ -10,6 +10,20 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 SLUG="$1"
 TIER="${2:-standard}"
 DIR="$ROOT_DIR/instructions/session-logs/$(date +%F)-$SLUG"
+
+# shellcheck source=_common.sh
+source "$(dirname "$0")/_common.sh"
+validate_helper_name "$SLUG" "task slug"
+validate_task_tier "$TIER"
+reject_symlinks_under_root "$ROOT_DIR" "$DIR"
+require_directory_or_missing "$DIR"
+
+if [[ -e "$DIR" ]]; then
+  echo "ERROR: session log already exists: $DIR" >&2
+  echo "Choose a different slug or continue the existing session explicitly." >&2
+  exit 1
+fi
+
 mkdir -p "$DIR"
 
 BRANCH="$(git -C "$ROOT_DIR" branch --show-current 2>/dev/null || true)"

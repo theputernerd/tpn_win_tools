@@ -3,20 +3,18 @@ set -euo pipefail
 
 # bootstrap_agent_standard_v4.sh
 #
-# Installs (or upgrades) the generic agent-instructions framework into the
-# current project root. Unlike v3, the framework content lives as real files
-# under ./framework/ next to this script, so it can be edited normally and
-# versioned/upgraded in existing projects without clobbering user content.
+# Initializes the generic agent-instructions framework in the current project.
+# This is deliberately a fresh initializer, not an upgrader or merge tool.
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 FRAMEWORK_DIR="$SCRIPT_DIR/framework"
 
-MODE="install"          # install | upgrade
-FORCE=0
+ASSUME_YES=0
+DRY_RUN=0
 CLAUDE_MODE="symlink"   # symlink | copy
 
-# Files that belong to the user once written. They are seeded only if missing
-# and are NEVER overwritten, even by --upgrade or --force.
+# These files are templates for project-owned content. The distinction is
+# informational during a fresh install; no installed files are upgraded later.
 USER_SEED_FILES=(
   "instructions/project-commands.sh"
   "instructions/product/overview.md"
@@ -25,38 +23,38 @@ USER_SEED_FILES=(
 
 usage() {
   cat <<'EOH'
-Usage: ./bootstrap_agent_standard_v4.sh [--upgrade] [--force] [--copy-claude]
+Usage: ./bootstrap_agent_standard_v4.sh [--dry-run] [--yes] [--copy-claude]
 
-Installs the agent-instructions framework into the current directory.
+Initializes the Agent Standard framework in the current directory.
 
-Modes:
-  (default)      Fresh install. Creates every missing file; leaves existing
-                 files untouched.
-  --upgrade      Overwrite framework-managed files with the versions shipped in
-                 ./framework/. User content (see below) is never touched. Use
-                 this to pull framework improvements into an existing project.
+This tool is for a project that does not already contain Agent Standard. It
+does not merge with or upgrade an existing installation. If a reserved path
+already exists, the initializer stops without changing anything.
 
 Options:
-  --force        Overwrite managed files during a fresh install too.
-  --copy-claude  Create CLAUDE.md as a real copy instead of a symlink to AGENTS.md.
+  --dry-run      Preview every addition without changing the filesystem.
+  --yes          Confirm initialization non-interactively.
+  --copy-claude  Create CLAUDE.md as a copy instead of a symlink to AGENTS.md.
   -h, --help     Show this help.
 
-User content (seeded if missing, never overwritten):
-  instructions/project-commands.sh, instructions/product/overview.md,
-  instructions/product/roadmap.md, and everything you create under
-  instructions/session-logs/, instructions/design-logs/,
-  instructions/product/modules/, instructions/modules/, and
-  instructions/project-conventions/.
+After initialization, all installed files belong to the project. Future
+versions of this initializer will not overwrite them automatically.
 EOH
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --upgrade) MODE="upgrade"; shift ;;
-    --force) FORCE=1; shift ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    --yes) ASSUME_YES=1; shift ;;
     --copy-claude) CLAUDE_MODE="copy"; shift ;;
+    --upgrade|--force)
+      echo "ERROR: $1 is no longer supported." >&2
+      echo "This tool only initializes projects without an existing Agent Standard installation." >&2
+      echo "No files were changed." >&2
+      exit 2
+      ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
+    *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
 
@@ -65,86 +63,167 @@ if [[ ! -d "$FRAMEWORK_DIR" ]]; then
   exit 1
 fi
 
-PROJECT_ROOT="$(pwd)"
+PROJECT_ROOT="$(pwd -P)"
 
-if [[ "$(cd "$PROJECT_ROOT" && pwd)" == "$SCRIPT_DIR" ]]; then
-  echo "ERROR: refusing to install into the framework's own source directory." >&2
-  echo "cd into your project root first, then run this script by absolute path." >&2
+if [[ "$PROJECT_ROOT" == "$SCRIPT_DIR" ]]; then
+  echo "ERROR: refusing to initialize the framework's own source directory." >&2
+  echo "Change to the project root first, then run this script by absolute path." >&2
   exit 1
 fi
 
 is_user_seed() {
   local rel="$1"
-  local s
-  for s in "${USER_SEED_FILES[@]}"; do
-    [[ "$rel" == "$s" ]] && return 0
+  local seed
+  for seed in "${USER_SEED_FILES[@]}"; do
+    [[ "$rel" == "$seed" ]] && return 0
   done
   return 1
 }
 
-copied=0 skipped=0 upgraded=0 seeded=0
+reject_unsafe_relative_path() {
+  local rel="$1"
+  local part
+  local -a parts
+  [[ -n "$rel" && "$rel" != /* ]] || return 1
+  IFS='/' read -r -a parts <<< "$rel"
+  for part in "${parts[@]}"; do
+    [[ -n "$part" && "$part" != "." && "$part" != ".." ]] || return 1
+  done
+}
 
-# Walk every file shipped in the framework and place it appropriately.
-while IFS= read -r -d '' src; do
+symlink_in_target_path() {
+  local rel="$1"
+  local current="$PROJECT_ROOT"
+  local part
+  local -a parts
+  IFS='/' read -r -a parts <<< "$rel"
+  for part in "${parts[@]}"; do
+    current="$current/$part"
+    if [[ -L "$current" ]]; then
+      printf '%s' "$current"
+      return 0
+    fi
+  done
+  return 1
+}
+
+mapfile -d '' -t framework_files < <(find "$FRAMEWORK_DIR" -type f -print0 | sort -z)
+if [[ "${#framework_files[@]}" -eq 0 ]]; then
+  echo "ERROR: framework contains no files: $FRAMEWORK_DIR" >&2
+  exit 1
+fi
+
+echo "Agent Standard initialization"
+echo ""
+echo "Target: $PROJECT_ROOT"
+echo ""
+echo "This initializer does not merge with or upgrade an existing Agent Standard installation."
+echo "Existing application files outside the reserved paths will not be modified."
+echo ""
+
+conflicts=0
+unsafe=0
+
+# These roots are reserved as a unit. Refusing an existing directory avoids a
+# partial/mixed installation even if none of today's individual files collide.
+reserved_roots=(".framework-version" "AGENTS.md" "tasks.sh" "instructions" "CLAUDE.md")
+for rel in "${reserved_roots[@]}"; do
+  if unsafe_path="$(symlink_in_target_path "$rel")"; then
+    echo "UNSAFE    $rel (symlink at $unsafe_path)"
+    unsafe=$((unsafe + 1))
+  elif [[ -e "$PROJECT_ROOT/$rel" ]]; then
+    echo "CONFLICT  $rel (reserved path already exists)"
+    conflicts=$((conflicts + 1))
+  fi
+done
+
+if [[ "$conflicts" -ne 0 || "$unsafe" -ne 0 ]]; then
+  echo ""
+  echo "ERROR: initialization cannot continue safely." >&2
+  echo "Resolve the paths above manually; this initializer will not overwrite, merge, or follow them." >&2
+  echo "No files were changed." >&2
+  exit 1
+fi
+
+echo "Planned additions:"
+for src in "${framework_files[@]}"; do
+  rel="${src#"$FRAMEWORK_DIR"/}"
+  if ! reject_unsafe_relative_path "$rel"; then
+    echo "ERROR: unsafe path in framework source: $rel" >&2
+    exit 1
+  fi
+  if is_user_seed "$rel"; then
+    printf '  SEED    %s\n' "$rel"
+  else
+    printf '  CREATE  %s\n' "$rel"
+  fi
+done
+if [[ "$CLAUDE_MODE" == "copy" ]]; then
+  echo "  COPY    CLAUDE.md from AGENTS.md"
+else
+  echo "  LINK    CLAUDE.md -> AGENTS.md"
+fi
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  echo ""
+  echo "Dry run complete. No files were changed."
+  exit 0
+fi
+
+if [[ "$ASSUME_YES" -ne 1 ]]; then
+  if [[ ! -t 0 ]]; then
+    echo "" >&2
+    echo "ERROR: confirmation is required, but input is not interactive." >&2
+    echo "Review with --dry-run, then pass --yes to initialize non-interactively." >&2
+    echo "No files were changed." >&2
+    exit 1
+  fi
+  echo ""
+  read -r -p "Continue? [y/N] " reply
+  case "$reply" in
+    y|Y|yes|YES|Yes) ;;
+    *) echo "Cancelled. No files were changed."; exit 0 ;;
+  esac
+fi
+
+copied=0
+seeded=0
+for src in "${framework_files[@]}"; do
   rel="${src#"$FRAMEWORK_DIR"/}"
   dst="$PROJECT_ROOT/$rel"
   mkdir -p "$(dirname "$dst")"
-
+  cp -p -- "$src" "$dst"
   if is_user_seed "$rel"; then
-    if [[ -e "$dst" ]]; then
-      echo "keep (user)   $rel"; skipped=$((skipped+1))
-    else
-      cp -p "$src" "$dst"; echo "seed          $rel"; seeded=$((seeded+1))
-    fi
-    continue
-  fi
-
-  # Managed file.
-  if [[ ! -e "$dst" ]]; then
-    cp -p "$src" "$dst"; echo "write         $rel"; copied=$((copied+1))
-  elif [[ "$MODE" == "upgrade" || "$FORCE" -eq 1 ]]; then
-    cp -p "$src" "$dst"; echo "upgrade       $rel"; upgraded=$((upgraded+1))
+    echo "seed          $rel"
+    seeded=$((seeded + 1))
   else
-    echo "skip (exists) $rel"; skipped=$((skipped+1))
+    echo "write         $rel"
+    copied=$((copied + 1))
   fi
-done < <(find "$FRAMEWORK_DIR" -type f -print0)
+done
 
-# CLAUDE.md -> AGENTS.md
 claude_path="$PROJECT_ROOT/CLAUDE.md"
 agents_path="$PROJECT_ROOT/AGENTS.md"
 if [[ "$CLAUDE_MODE" == "copy" ]]; then
-  if [[ -e "$claude_path" && "$MODE" != "upgrade" && "$FORCE" -ne 1 ]]; then
-    echo "skip (exists) CLAUDE.md"
-  else
-    [[ -e "$claude_path" || -L "$claude_path" ]] && rm -f "$claude_path"
-    cp -p "$agents_path" "$claude_path"; echo "write         CLAUDE.md (copy)"
-  fi
+  cp -p -- "$agents_path" "$claude_path"
+  echo "write         CLAUDE.md (copy)"
 else
-  if [[ -L "$claude_path" ]]; then
-    echo "keep          CLAUDE.md (symlink)"
-  elif [[ -e "$claude_path" ]]; then
-    echo "skip (exists) CLAUDE.md (not a symlink; leaving as-is)"
+  if ln -s "AGENTS.md" "$claude_path" 2>/dev/null; then
+    echo "link          CLAUDE.md -> AGENTS.md"
   else
-    if ln -s "AGENTS.md" "$claude_path" 2>/dev/null; then
-      echo "link          CLAUDE.md -> AGENTS.md"
-    else
-      cp -p "$agents_path" "$claude_path"; echo "write         CLAUDE.md (symlink failed; copied)"
-    fi
+    cp -p -- "$agents_path" "$claude_path"
+    echo "write         CLAUDE.md (symlink unavailable; copied instead)"
   fi
 fi
 
 version="$(cat "$FRAMEWORK_DIR/.framework-version" 2>/dev/null || echo unknown)"
 echo ""
-echo "Framework v$version installed into: $PROJECT_ROOT"
-echo "  new: $copied   upgraded: $upgraded   seeded: $seeded   skipped: $skipped"
+echo "Framework v$version initialized in: $PROJECT_ROOT"
+echo "  created: $copied   seeded: $seeded"
 echo ""
-if [[ "$MODE" == "upgrade" ]]; then
-  echo "Upgrade complete. Managed files refreshed; user content left intact."
-else
-  echo "Next steps:"
-  echo "  1) Run the FIRST task 'project-init': choose the stack and fill"
-  echo "     instructions/project-commands.sh so ./tasks.sh validate works."
-  echo "  2) Seed instructions/product/overview.md and roadmap.md with intent."
-  echo "  3) Start a task log: instructions/helpers/create-session-log.sh <slug>"
-  echo "  4) Add a module doc when you build one: instructions/helpers/add-module.sh <name>"
-fi
+echo "Next steps:"
+echo "  1) Review AGENTS.md and any existing project-specific agent instructions."
+echo "  2) Run the first task 'project-init': choose the stack and fill"
+echo "     instructions/project-commands.sh so ./tasks.sh validate works."
+echo "  3) Seed instructions/product/overview.md and roadmap.md with intent."
+echo "  4) Start a task log: instructions/helpers/create-session-log.sh <slug>"

@@ -1,4 +1,4 @@
-verified-against: <commit>   <!-- short commit this doc was last confirmed true at; update when you change the module -->
+verified-against: <commit>   <!-- existing implementation commit used as the review baseline -->
 
 # Module: <name>
 

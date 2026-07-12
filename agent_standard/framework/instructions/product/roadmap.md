@@ -1,8 +1,8 @@
 # Roadmap
 
-<!-- USER CONTENT. This drives iteration. Each task starts by pulling from here
-and ends by updating it. Keep items small enough to finish in one session where
-possible. -->
+<!-- USER CONTENT. This drives planned product iteration. Planned tasks move
+through this file; ordinary unplanned fixes do not need synthetic entries. Keep
+items small enough to finish in one session where possible. -->
 
 ## Now (in progress)
 - [ ] <item> — session log: <path>
@@ -14,8 +14,9 @@ possible. -->
 - [ ] <idea>
 
 ## Done
-- [x] YYYY-MM-DD <item> — changelog: modules/<m>/changelog.md
+- [x] YYYY-MM-DD <item> — outcome/docs: <path or summary>
 
 ---
-Convention: pick from **Next** → move to **Now** → build → `./tasks.sh validate`
-→ record in the module changelog → move to **Done** and note what unblocked next.
+Convention for planned work: pick from **Next** → move to **Now** → build →
+`./tasks.sh validate` → update applicable docs → move to **Done** and note what
+unblocked next.

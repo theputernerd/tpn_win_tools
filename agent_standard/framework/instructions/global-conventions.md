@@ -39,12 +39,15 @@ build knowledge across docs — point at the verbs. `validate` is the completion
 - Every `module.md` starts with a marker:
 
   ```
-  verified-against: <short-commit>   # the commit at which this doc was last confirmed true
+  verified-against: <short-commit>   # existing implementation commit used as the review baseline
   ```
 
-  When you change a module, re-confirm its `module.md` and update this to the new
-  commit in the same change. `helpers/check-session.sh` flags docs whose marker
-  has fallen far behind HEAD so drift is visible instead of silent.
+  When a change affects what the module doc describes, re-confirm the doc and
+  set the marker to the latest existing implementation commit used as the
+  review baseline. The doc change also covers code changed alongside it. A
+  commit cannot contain its own hash, so the marker is not required to name the
+  commit that edits the doc. `helpers/check-session.sh` flags markers far behind
+  HEAD as a drift heuristic, not proof that a doc is current.
 - Changelogs are concise and append-only.
 
 ## Validation

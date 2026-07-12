@@ -25,7 +25,7 @@
 
 # Docs reviewed
 - README.md, agent-contract.md, escalation-policy.md, global-conventions.md
-- product/overview.md, product/roadmap.md, modules/<m>/module.md
+- product/overview.md, relevant product/module docs, and roadmap when this is planned product work
 
 # Git baseline
 - Branch / Base commit / Current HEAD / Working tree status:
@@ -52,4 +52,6 @@
 - Restart / migration required:
 
 # Docs to update on completion
-- modules/<m>/module.md (+ verified-against), changelog.md, product/roadmap.md
+- module.md (+ verified-against) if documented behavior/interfaces/invariants changed
+- changelog.md if user-visible, operationally significant, compatibility/migration, or an important fix
+- product/roadmap.md if planned scope, priorities, status, or direction changed

@@ -7,32 +7,107 @@ set -euo pipefail
 #   - wire as a git pre-commit hook (use --strict to block commits on failure)
 #
 # Checks:
-#   1. A session log exists and its status.md has a valid Status: line.
+#   1. The explicit/current session exists and its status.md has a valid status.
 #   2. project-commands.sh defines cmd_validate for real (not just _undefined).
 #   3. module.md docs whose verified-against: marker has fallen far behind HEAD
 #      (drift), or is unset.
 #
+# Session selection: --session, then AGENT_SESSION_ID, then the sole ACTIVE
+# session. When none is ACTIVE, the most recently modified session is checked
+# as a compatibility fallback; multiple ACTIVE sessions require an explicit ID.
+#
 # Exit: non-zero on hard failures ONLY in --strict mode; otherwise 0 with warnings.
 
 STRICT=0
-[[ "${1:-}" == "--strict" ]] && STRICT=1
+SESSION_ID="${AGENT_SESSION_ID:-}"
+
+usage() {
+  echo "Usage: $0 [--strict] [--session <session-directory-name>]" >&2
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --strict) STRICT=1; shift ;;
+    --session)
+      [[ $# -ge 2 ]] || { echo "ERROR: --session requires a value" >&2; usage; exit 2; }
+      SESSION_ID="$2"
+      shift 2
+      ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "ERROR: unknown argument: $1" >&2; usage; exit 2 ;;
+  esac
+done
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 INSTR="$ROOT_DIR/instructions"
 STALE_THRESHOLD="${CHECK_SESSION_STALE_COMMITS:-50}"
 
+# shellcheck source=_common.sh
+source "$(dirname "$0")/_common.sh"
+
 fail=0
 warn() { echo "WARN: $*" >&2; }
 err()  { echo "FAIL: $*" >&2; fail=1; }
 
-# 1. Session log present and valid.
-latest="$(find "$INSTR/session-logs" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort | tail -n1)"
-if [[ -z "$latest" ]]; then
+# 1. Select the current session explicitly, by the sole ACTIVE status, or as a
+# compatibility fallback by modification time when no session is ACTIVE.
+session_root="$INSTR/session-logs"
+selected=""
+
+if [[ -n "$SESSION_ID" ]]; then
+  if validate_helper_name "$SESSION_ID" "session name"; then
+    selected="$session_root/$SESSION_ID"
+    if [[ ! -d "$selected" || -L "$selected" ]]; then
+      err "selected session does not exist as a real directory: $SESSION_ID"
+      selected=""
+    fi
+  else
+    err "invalid session name: $SESSION_ID"
+  fi
+else
+  active_sessions=()
+  while IFS= read -r -d '' candidate; do
+    status_file="$candidate/status.md"
+    if [[ -f "$status_file" && ! -L "$status_file" ]] &&
+       grep -qE '^Status:[[:space:]]*ACTIVE[[:space:]]*$' "$status_file"; then
+      active_sessions+=("$candidate")
+    fi
+  done < <(find "$session_root" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+
+  if [[ "${#active_sessions[@]}" -eq 1 ]]; then
+    selected="${active_sessions[0]}"
+  elif [[ "${#active_sessions[@]}" -gt 1 ]]; then
+    err "multiple ACTIVE sessions found; pass --session <name> or set AGENT_SESSION_ID"
+    for candidate in "${active_sessions[@]}"; do
+      warn "active session: $(basename "$candidate")"
+    done
+  else
+    newest_mtime=-1
+    while IFS= read -r -d '' candidate; do
+      candidate_mtime="$(stat -c %Y "$candidate" 2>/dev/null || echo 0)"
+      if [[ "$candidate_mtime" -gt "$newest_mtime" ]]; then
+        newest_mtime="$candidate_mtime"
+        selected="$candidate"
+      fi
+    done < <(find "$session_root" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+    if [[ -n "$selected" ]]; then
+      warn "no ACTIVE session found; checking most recently modified session: $(basename "$selected")"
+    fi
+  fi
+fi
+
+if [[ -z "$selected" && "$fail" -eq 0 ]]; then
   err "no session log under instructions/session-logs/ (helpers/create-session-log.sh <slug>)"
-elif [[ ! -f "$latest/status.md" ]]; then
-  err "session log $(basename "$latest") has no status.md"
-elif ! grep -qE '^Status:[[:space:]]*(ACTIVE|PAUSED|FAILED|COMPLETE)\b' "$latest/status.md"; then
-  err "status.md in $(basename "$latest") has no valid Status: line"
+elif [[ -n "$selected" ]]; then
+  if [[ -L "$selected/status.md" ]]; then
+    err "session log $(basename "$selected") has a symlinked status.md"
+  elif [[ ! -f "$selected/status.md" ]]; then
+    err "session log $(basename "$selected") has no status.md"
+  elif ! grep -qE '^Status:[[:space:]]*(ACTIVE|PAUSED|FAILED|COMPLETE)[[:space:]]*$' "$selected/status.md"; then
+    err "status.md in $(basename "$selected") has no valid Status: line"
+  else
+    echo "check-session: session $(basename "$selected")"
+  fi
 fi
 
 # 2. validate gate is defined for real.

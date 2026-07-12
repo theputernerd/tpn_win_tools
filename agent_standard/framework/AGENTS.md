@@ -26,6 +26,7 @@ make it real before building features.
 - `instructions/escalation-policy.md`
 - `instructions/global-conventions.md`
 - `instructions/product/overview.md` and the relevant `instructions/product/modules/<m>/`
+- `instructions/product/roadmap.md` when the task is planned product work or changes priorities/scope
 - The relevant `instructions/modules/<module>/module.md`
 - Any relevant `instructions/project-conventions/`
 
@@ -37,7 +38,7 @@ do not pay the full tax on a trivial change.
 | Tier | Examples | Required artifacts |
 |------|----------|--------------------|
 | **trivial** | docs, comment, one-line obvious fix, formatting | one line in a session `action-log.md`; pass `./tasks.sh validate` |
-| **standard** | a feature, a bug fix, a contained refactor | session log (plan + action log + handoff); `./tasks.sh validate`; update the module doc + changelog |
+| **standard** | a feature, a bug fix, a contained refactor | session log (plan + action log + handoff); `./tasks.sh validate`; applicable documentation updates |
 | **high-risk** | multi-module change, architecture, migration, security, concurrency | everything in standard **plus** a design log before coding, and honour every escalation trigger |
 
 When unsure, pick the higher tier.
@@ -51,14 +52,27 @@ When unsure, pick the higher tier.
 5. Write a plan before acting.
 6. Log intent before, and result after, each material action.
 7. Run `./tasks.sh validate` — it must exit 0.
-8. Update the relevant module `module.md` and `changelog.md`, and the roadmap.
+8. Update only the documentation triggered by the change (see below).
 9. Write the handoff summary.
 
 ## Iteration loop
 
-Product work is driven by `instructions/product/roadmap.md`, not ad hoc:
+Planned product work is driven by `instructions/product/roadmap.md`:
 pick from the backlog → (design log if high-risk) → session log → build →
-`validate` → changelog → move the item on the roadmap and note what's next.
+`validate` → applicable documentation → move the item on the roadmap and note
+what's next.
+
+An unplanned contained bug fix does not need a synthetic roadmap entry.
+
+## Documentation triggers
+
+- Update a module `module.md` when behavior, interfaces, invariants, or
+  operational constraints described there changed.
+- Update a module `changelog.md` for user-visible or operationally significant
+  changes, compatibility/migration work, and important defect fixes.
+- Update `product/roadmap.md` only when planned scope, priorities, status, or
+  product direction changed.
+- Record validation for every meaningful code change.
 
 ## Reuse-first engineering
 
@@ -68,5 +82,5 @@ If you deliberately choose a narrow fix, justify it in the session log.
 ## Completion rule
 
 A standard/high-risk task is incomplete without: a tier, a plan before action,
-continuous logging, a passing `./tasks.sh validate`, updated module doc +
-changelog + roadmap, and a handoff summary.
+continuous logging, a passing `./tasks.sh validate`, documentation required by
+the triggers above, and a handoff summary.

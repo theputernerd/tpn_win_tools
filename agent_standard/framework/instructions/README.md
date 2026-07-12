@@ -9,7 +9,8 @@ while iteratively building and improving a product.
 1. Run `./tasks.sh validate`. If it errors "not defined", do the **project-init**
    task first (see `AGENTS.md`).
 2. Read `README.md`, `agent-contract.md`, `escalation-policy.md`, `global-conventions.md`.
-3. Read `product/overview.md`, `product/roadmap.md`, and relevant product modules.
+3. Read `product/overview.md` and relevant product modules. Read the roadmap for
+   planned product work or when the task changes priorities or scope.
 4. Read the relevant `modules/<module>/module.md`.
 5. Classify the task and pick a **tier** (trivial / standard / high-risk).
 6. Check escalation triggers.
@@ -41,15 +42,14 @@ Keep them separate. Each `module.md` carries a `verified-against:` marker (see
 `global-conventions.md`) so drift from the code becomes visible; run
 `helpers/check-session.sh` to surface stale docs and missing logs.
 
-## Upgrading the framework
+## Framework ownership
 
-Framework-managed files can be refreshed from a newer `framework/` with
-`bootstrap_agent_standard_v4.sh --upgrade`. User content
-(`project-commands.sh`, product docs, and everything you author under
-`session-logs/`, `design-logs/`, `modules/`, `product/modules/`,
-`project-conventions/`) is never overwritten.
+The bootstrap script is a fresh initializer, not an upgrade or merge tool. Once
+installed, all framework and project files belong to this project. Review and
+apply future framework changes manually so project-specific processes are not
+overwritten.
 
 ## Completion rule
 
-If the required tier's artifacts, a passing `./tasks.sh validate`, or the
-doc/roadmap updates are missing, the task is incomplete.
+If the required tier's artifacts, a passing `./tasks.sh validate`, or
+documentation triggered by the change is missing, the task is incomplete.
